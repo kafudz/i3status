@@ -610,7 +610,8 @@ int main(int argc, char *argv[]) {
             unsigned int len;
 #endif
             yajl_gen_get_buf(json_gen, &buf, &len);
-            (void)write(STDOUT_FILENO, buf, len);
+            ssize_t w_ret1 = write(STDOUT_FILENO, buf, len);
+            (void)w_ret1;
             yajl_gen_clear(json_gen);
         }
 
@@ -962,7 +963,8 @@ int main(int argc, char *argv[]) {
             unsigned int len;
 #endif
             yajl_gen_get_buf(json_gen, &buf, &len);
-            write(STDOUT_FILENO, buf, len);
+            ssize_t w_ret2 = write(STDOUT_FILENO, buf, len);
+            (void)w_ret2;
             yajl_gen_clear(json_gen);
         }
 
