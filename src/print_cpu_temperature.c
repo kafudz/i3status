@@ -221,21 +221,29 @@ void print_cpu_temperature_info(cpu_temperature_ctx_t *ctx) {
     temperature.raw_value = 0;
     sprintf(temperature.formatted_value, "%.2f", 0.0);
 
-    if (ctx->path == NULL)
-        asprintf(&thermal_zone, THERMAL_ZONE, ctx->zone);
-    else {
+        if (ctx->path == NULL) {
+        if (asprintf(&thermal_zone, THERMAL_ZONE, ctx->zone) == -1)
+            goto error;
+    } else {
         static glob_t globbuf;
         if (glob(ctx->path, GLOB_NOCHECK | GLOB_TILDE, NULL, &globbuf) != 0)
             die("glob() failed\n");
         if (globbuf.gl_pathc == 0) {
             /* No glob matches, the specified path does not contain a wildcard. */
-            asprintf(&thermal_zone, ctx->path, ctx->zone);
+            if (asprintf(&thermal_zone, ctx->path, ctx->zone) == -1) {
+                globfree(&globbuf);
+                goto error;
+            }
         } else {
             /* glob matched, we take the first match and ignore the others */
-            asprintf(&thermal_zone, "%s", globbuf.gl_pathv[0]);
+            if (asprintf(&thermal_zone, "%s", globbuf.gl_pathv[0]) == -1) {
+                globfree(&globbuf);
+                goto error;
+            }
         }
         globfree(&globbuf);
     }
+
 
     INSTANCE(thermal_zone);
 

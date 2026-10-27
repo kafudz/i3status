@@ -601,14 +601,19 @@ int main(int argc, char *argv[]) {
     yajl_gen json_gen = yajl_gen_alloc(NULL, NULL);
 #endif
 
-    if (output_format == O_I3BAR) {
-        /* Initialize the i3bar protocol. See i3/docs/i3bar-protocol
-         * for details. */
-        printf("{\"version\":1}\n[\n");
-        fflush(stdout);
-        yajl_gen_array_open(json_gen);
-        yajl_gen_clear(json_gen);
-    }
+          if (output_format == O_I3BAR) {
+            yajl_gen_array_close(json_gen);
+            const unsigned char *buf;
+#if YAJL_MAJOR >= 2
+            size_t len;
+#else
+            unsigned int len;
+#endif
+            yajl_gen_get_buf(json_gen, &buf, &len);
+            (void)write(STDOUT_FILENO, buf, len);
+            yajl_gen_clear(json_gen);
+        }
+
     if (output_format == O_TERM) {
         /* Save the cursor-position and hide the cursor */
         printf("\033[s\033[?25l");
