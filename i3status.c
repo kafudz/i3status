@@ -948,6 +948,7 @@ int main(int argc, char *argv[]) {
                 SEC_CLOSE_MAP;
             }
         }
+
         if (output_format == O_I3BAR) {
             yajl_gen_array_close(json_gen);
             const unsigned char *buf;
@@ -957,7 +958,8 @@ int main(int argc, char *argv[]) {
             unsigned int len;
 #endif
             yajl_gen_get_buf(json_gen, &buf, &len);
-            write(STDOUT_FILENO, buf, len);
+            ssize_t w_ret = write(STDOUT_FILENO, buf, len);
+            (void)w_ret;
             yajl_gen_clear(json_gen);
         }
 
