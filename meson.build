@@ -123,7 +123,7 @@ if get_option('mans')
   endforeach
 
 else
-  if run_command('[', '-f', 'man/i3status.1', ']').returncode() == 0
+  if run_command('[', '-f', 'man/i3status.1', ']', check: false).returncode() == 0
     install_data(
       [
 	'man/i3status.1',

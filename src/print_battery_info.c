@@ -536,7 +536,7 @@ static bool slurp_all_batteries(battery_info_ctx_t *ctx, struct battery_info *ba
     char *outwalk = buffer;
     bool is_found = false;
 
-    char *placeholder;
+    const char *placeholder;
     char *globpath = sstrdup(path);
     if ((placeholder = strstr(path, "%d")) != NULL) {
         char *globplaceholder = globpath + (placeholder - path);
