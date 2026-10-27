@@ -68,8 +68,6 @@ void print_volume(volume_ctx_t *ctx) {
     char *outwalk = ctx->buf;
     int pbval = 1;
 
-    /* Printing volume works with ALSA and PulseAudio at the moment */
-        /* Printing volume works with ALSA and PulseAudio at the moment */
     if (output_format == O_I3BAR) {
         char *instance;
         if (asprintf(&instance, "%s.%s.%d", ctx->device, ctx->mixer, ctx->mixer_idx) == -1)
