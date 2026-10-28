@@ -29,12 +29,12 @@
  * block, which may be reallocated by a later setenv()/unsetenv() call.
  */
 static bool tz_snapshot_taken = false;
-static char *saved_tz = NULL;       /* strdup()'d snapshot of $TZ, or NULL */
+static char *saved_tz = NULL;        /* strdup()'d snapshot of $TZ, or NULL */
 static const char *active_tz = NULL; /* zone currently in effect */
 
 void set_timezone(const char *tz) {
     if (!tz_snapshot_taken) {
-        /* sstrdup(NULL) == NULL, so unset $TZ is handled correctly. */
+        /* sstrdup(NULL) == NULL, so an unset $TZ is handled correctly. */
         saved_tz = sstrdup(getenv("TZ"));
         tz_snapshot_taken = true;
     }
@@ -101,7 +101,7 @@ static char *append_clamped(char *outwalk, char *buf, size_t buflen,
         return outwalk;
     size_t written = (size_t)n;
     if (written >= avail)
-        written = avail - 1; /* truncated; leave room for NUL */
+        written = avail - 1; /* truncated; leave room for the NUL */
     return outwalk + written;
 }
 
@@ -110,9 +110,13 @@ void print_time(time_ctx_t *ctx) {
     struct tm local_tm, tm;
 
     if (ctx->title != NULL) {
-        /* yajl_gen_string wants const unsigned char *; cast explicitly so
-         * -Wpointer-sign stays quiet. */
-        INSTANCE((const unsigned char *)ctx->title);
+        /*
+         * NOTE: the INSTANCE() macro now caches its argument in a
+         * `const char *` local and casts each use internally, so no cast is
+         * needed (or wanted) here.  Casting at the call site breaks the
+         * strlen() side of the macro under -Wpointer-sign.
+         */
+        INSTANCE(ctx->title);
     }
 
     set_timezone(NULL);
@@ -169,7 +173,7 @@ void print_time(time_ctx_t *ctx) {
          * overflow, so distinguish the two.
          */
         if (ctx->format[0] == '\0') {
-            /* Nothing to print.  Leave ctx->buf empty. */
+            /* Nothing to print; leave ctx->buf empty. */
         } else {
             const size_t written =
                 strftime(ctx->buf, ctx->buflen, ctx->format, &tm);
@@ -194,7 +198,8 @@ void print_time(time_ctx_t *ctx) {
             placeholder_t placeholders[] = {
                 {.name = "%time", .value = string_time}};
             const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
-            char *formatted = format_placeholders(ctx->format, placeholders, num);
+            char *formatted =
+                format_placeholders(ctx->format, placeholders, num);
             OUTPUT_FORMATTED;
             free(formatted);
         }
