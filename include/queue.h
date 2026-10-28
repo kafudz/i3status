@@ -32,8 +32,26 @@
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
  */
 
-#ifndef _SYS_QUEUE_H_
-#define _SYS_QUEUE_H_
+/*
+ * FIXED: The historical guard `_SYS_QUEUE_H_` collides with glibc's
+ * <sys/queue.h>, which uses the same macro.  i3status vendors this header
+ * precisely so it does not depend on the system version; using the shared
+ * guard means that if any other header has already pulled in glibc's
+ * <sys/queue.h> (transitively, e.g. via <ifaddrs.h> on some systems), the
+ * definitions below would be silently skipped — producing "undefined macro"
+ * or "duplicate definition" errors that depend on include order.  The guard
+ * is therefore renamed to a project-unique name.
+ */
+#ifndef _I3STATUS_SYS_QUEUE_H_
+#define _I3STATUS_SYS_QUEUE_H_
+
+/*
+ * FIXED: <stddef.h> is required for NULL, which is used by the
+ * *_HEAD_INITIALIZER and CIRCLEQ_END macros.  Without this include, a
+ * translation unit that includes <queue.h> before any header that pulls in
+ * NULL would fail to compile.
+ */
+#include <stddef.h>
 
 /*
  * This file defines five types of data structures: singly-linked lists,
@@ -152,10 +170,18 @@
         (head)->slh_first = (head)->slh_first->field.sle_next; \
     } while (0)
 
+/*
+ * FIXED: The head-removal branch previously did not invalidate the removed
+ * element's `sle_next` field, while the non-head branch did.  Under
+ * QUEUE_MACRO_DEBUG / DIAGNOSTIC this meant that a use-after-remove of the
+ * first element would not be caught, but the same mistake on a middle
+ * element would be.  The two branches now behave consistently.
+ */
 #define SLIST_REMOVE(head, elm, type, field)                                 \
     do {                                                                     \
         if ((head)->slh_first == (elm)) {                                    \
             SLIST_REMOVE_HEAD((head), field);                                \
+            _Q_INVALIDATE((elm)->field.sle_next);                            \
         } else {                                                             \
             struct type *curelm = (head)->slh_first;                         \
                                                                              \
@@ -546,4 +572,4 @@
         _Q_INVALIDATE((elm)->field.cqe_next);                                      \
     } while (0)
 
-#endif /* !_SYS_QUEUE_H_ */
+#endif /* !_I3STATUS_SYS_QUEUE_H_ */
