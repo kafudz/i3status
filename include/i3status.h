@@ -167,11 +167,30 @@ extern char *pct_mark;
         }                                                                     \
     } while (0)
 
+/*
+ * Emit the i3bar "instance" field for the current module.
+ *
+ * The argument is evaluated exactly once and cached in a `const char *`
+ * local, then cast appropriately for each use:
+ *   - yajl_gen_string() takes const unsigned char *
+ *   - strlen()          takes const char *
+ *
+ * Casting at the *call site* cannot fix this: it satisfies one use and
+ * breaks the other under -Wpointer-sign.  The cast must be per-use, which
+ * is only possible inside the macro.  This also avoids double evaluation
+ * of the argument if the caller passes a function call or a compound
+ * expression.
+ *
+ * Wrapped in do/while(0) so the macro behaves like a single statement
+ * inside if/else bodies.
+ */
 #define INSTANCE(instance)                                                                         \
     do {                                                                                           \
         if (output_format == O_I3BAR) {                                                            \
+            const char *_i3s_instance = (instance);                                                \
             yajl_gen_string(ctx->json_gen, (const unsigned char *)"instance", strlen("instance")); \
-            yajl_gen_string(ctx->json_gen, (const unsigned char *)instance, strlen(instance));     \
+            yajl_gen_string(ctx->json_gen, (const unsigned char *)_i3s_instance,                   \
+                            strlen(_i3s_instance));                                                \
         }                                                                                          \
     } while (0)
 
