@@ -191,8 +191,9 @@ static int valid_color(const char *value) {
 static char *get_config_path(void) {
     char *xdg_config_home, *xdg_config_dirs, *config_path;
 
-    /* 1: check for $XDG_CONFIG_HOME/i3status/config */
-    if ((xdg_config_home = getenv("XDG_CONFIG_HOME")) == NULL)
+    /* 1: check for $XDG_CONFIG_HOME/i3status/config. An empty
+     * XDG_CONFIG_HOME is treated like an unset variable. */
+    if ((xdg_config_home = getenv("XDG_CONFIG_HOME")) == NULL || *xdg_config_home == '\0')
         xdg_config_home = "~/.config";
 
     xdg_config_home = resolve_tilde(xdg_config_home);
@@ -206,8 +207,6 @@ static char *get_config_path(void) {
 
     /* Keep the legacy home-directory path ahead of XDG_CONFIG_DIRS for
      * compatibility with existing i3status installations. */
-    if ((xdg_config_dirs = getenv("XDG_CONFIG_DIRS")) == NULL)
-        xdg_config_dirs = "/etc/xdg";
 
     /* Check the traditional path under the home directory. */
     config_path = resolve_tilde("~/.i3status.conf");
@@ -215,7 +214,10 @@ static char *get_config_path(void) {
         return config_path;
     free(config_path);
 
-    /* FIX: check strdup() result for NULL */
+    /* 3: check $XDG_CONFIG_DIRS. An empty value is treated as unset. */
+    if ((xdg_config_dirs = getenv("XDG_CONFIG_DIRS")) == NULL || *xdg_config_dirs == '\0')
+        xdg_config_dirs = "/etc/xdg";
+
     char *buf = strdup(xdg_config_dirs);
     if (buf == NULL)
         die("strdup() failed\n");
@@ -236,7 +238,7 @@ static char *get_config_path(void) {
     }
     free(buf);
 
-    /* Finally, check the traditional path under /etc. */
+    /* 4: finally, check the traditional path under /etc. */
     config_path = SYSCONFDIR "/i3status.conf";
     if (path_exists(config_path))
         return sstrdup(config_path);
