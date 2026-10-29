@@ -204,11 +204,12 @@ static char *get_config_path(void) {
         return config_path;
     free(config_path);
 
-    /* 2: check for $XDG_CONFIG_DIRS/i3status/config */
+    /* Keep the legacy home-directory path ahead of XDG_CONFIG_DIRS for
+     * compatibility with existing i3status installations. */
     if ((xdg_config_dirs = getenv("XDG_CONFIG_DIRS")) == NULL)
         xdg_config_dirs = "/etc/xdg";
 
-    /* 3: check the traditional path under the home directory */
+    /* Check the traditional path under the home directory. */
     config_path = resolve_tilde("~/.i3status.conf");
     if (path_exists(config_path))
         return config_path;
@@ -235,13 +236,14 @@ static char *get_config_path(void) {
     }
     free(buf);
 
-    /* 4: check the traditional path under /etc */
+    /* Finally, check the traditional path under /etc. */
     config_path = SYSCONFDIR "/i3status.conf";
     if (path_exists(config_path))
         return sstrdup(config_path);
 
     die("Unable to find the configuration file (looked at "
-        "~/.i3status.conf, $XDG_CONFIG_HOME/i3status/config, " SYSCONFDIR "/i3status.conf and $XDG_CONFIG_DIRS/i3status/config)");
+        "$XDG_CONFIG_HOME/i3status/config, ~/.i3status.conf, "
+        "$XDG_CONFIG_DIRS/i3status/config and " SYSCONFDIR "/i3status.conf)");
 }
 
 /*
@@ -259,13 +261,18 @@ static char *get_default_separator() {
 /*
  * NEW: Validate that every entry in the "order" array refers to a section
  * that actually exists (either a singleton section or a titled section).
- * Returns the number of unknown entries; prints a warning for each.
+ * Returns the number of invalid entries and prints a diagnostic for each.
  */
 static int validate_order_sections(void) {
     int errors = 0;
     const int n = cfg_size(cfg, "order");
     for (int j = 0; j < n; j++) {
         const char *current = cfg_getnstr(cfg, "order", j);
+        if (current == NULL || current[0] == '\0') {
+            fprintf(stderr, "i3status: order entry %d is empty\n", j + 1);
+            errors++;
+            continue;
+        }
 
         /* Try a singleton section first (e.g. "time", "load", "memory"). */
         cfg_t *sec = cfg_getsec(cfg, current);
@@ -275,11 +282,16 @@ static int validate_order_sections(void) {
         /* Otherwise it must be "<section> <title>". Split on the first space. */
         const char *space = strchr(current, ' ');
         if (space != NULL) {
-            char *name = strndup(current, (size_t)(space - current));
-            cfg_t *tsec = cfg_gettsec(cfg, name, space + 1);
-            free(name);
-            if (tsec != NULL)
-                continue;
+            size_t name_len = (size_t)(space - current);
+            if (name_len > 0 && space[1] != '\0') {
+                char *name = strndup(current, name_len);
+                if (name == NULL)
+                    die("strndup() failed while validating order\n");
+                cfg_t *tsec = cfg_gettsec(cfg, name, space + 1);
+                free(name);
+                if (tsec != NULL)
+                    continue;
+            }
         }
 
         fprintf(stderr, "i3status: order entry \"%s\" does not match any configured section\n", current);
@@ -673,15 +685,21 @@ int main(int argc, char *argv[]) {
             cfg_general->name, cfg_general->line, interval);
     }
 
-    /* NEW: validate the order array against configured sections.
-     *      This is always useful, but especially in --config-test mode. */
+    /* Validate the order array before either testing the configuration or
+     * entering the status-generation loop. Unknown entries otherwise produce
+     * a silently incomplete status line. */
     int order_errors = validate_order_sections();
-
-    if (config_test_only) {
-        if (order_errors > 0) {
-            fprintf(stderr, "i3status: config test FAILED (%d unknown order entry/entries)\n", order_errors);
+    if (order_errors > 0) {
+        if (config_test_only) {
+            fprintf(stderr, "i3status: config test FAILED (%d invalid order entr%s)\n",
+                    order_errors, order_errors == 1 ? "y" : "ies");
             return EXIT_FAILURE;
         }
+        die("Found %d invalid entr%s in the 'order' array; fix the configuration.\n",
+            order_errors, order_errors == 1 ? "y" : "ies");
+    }
+
+    if (config_test_only) {
         printf("i3status: config file \"%s\" parsed successfully.\n", configfile);
         printf("i3status: output_format = %s, interval = %d\n", output_str, interval);
         return EXIT_SUCCESS;
