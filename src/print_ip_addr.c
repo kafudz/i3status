@@ -23,12 +23,9 @@
  *
  * The memory for the returned string is obtained with malloc(3), and can be
  * freed with free(3).
- *
- *
  */
 static char *strip_optional_label(const char *ifa_name) {
     char *copy = sstrdup(ifa_name);
-
     char *ptr = strchr(copy, ':');
 
     if (ptr) {
@@ -40,16 +37,17 @@ static char *strip_optional_label(const char *ifa_name) {
 
 /*
  * Return the IP address for the given interface or "no IP" if the
- * interface is up and running but hasn't got an IP address yet
- *
+ * interface is up and running but hasn't got an IP address yet.
  */
 const char *get_ip_addr(const char *interface, int family) {
     static char part[512];
     socklen_t len = 0;
-    if (family == AF_INET)
+
+    if (family == AF_INET) {
         len = sizeof(struct sockaddr_in);
-    else if (family == AF_INET6)
+    } else if (family == AF_INET6) {
         len = sizeof(struct sockaddr_in6);
+    }
 
     memset(part, 0, sizeof(part));
 
@@ -58,17 +56,21 @@ const char *get_ip_addr(const char *interface, int family) {
 
     getifaddrs(&ifaddr);
 
-    if (ifaddr == NULL)
+    if (ifaddr == NULL) {
         return NULL;
+    }
 
     /* Skip until we are at the input family address of interface */
     for (addrp = ifaddr; addrp != NULL; addrp = addrp->ifa_next) {
         /* Strip the label if present in the .ifa_name field. */
         char *stripped_ifa_name = strip_optional_label(addrp->ifa_name);
-
-        bool name_matches = strcmp(stripped_ifa_name, interface) != 0;
+        
+        /* Improved: Renamed from 'name_matches' to 'names_differ' for clarity, 
+         * since strcmp != 0 means they are different. */
+        bool names_differ = (strcmp(stripped_ifa_name, interface) != 0);
         free(stripped_ifa_name);
-        if (name_matches) {
+        
+        if (names_differ) {
             /* The interface does not have the right name, skip it. */
             continue;
         }
