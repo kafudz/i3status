@@ -6,7 +6,7 @@ i3status is a small program for generating a status bar for i3bar, dzen2, xmobar
 or similar programs. It is designed to be very efficient by issuing a very small
 number of system calls, as one generally wants to update such a status line
 every second. This ensures that even under high load, your status bar is updated
-correctly. Also, it saves a bit of energy by not hogging your CPU as much as
+correctly. It also saves a bit of energy by not hogging your CPU as much as
 spawning the corresponding amount of shell commands would.
 
 ## This fork
@@ -41,22 +41,25 @@ i3status has the following dependencies:
   * libyajl-dev
   * libasound2-dev
   * libnl-genl-3-dev
+  * libiw-dev (wireless extensions, used by the network module)
   * meson (compile-time only dependency)
   * asciidoc (only for the documentation)
   * libpulse-dev (for getting the current volume using PulseAudio)
 
-On Debian-based systems, the following line installs all requirements
-(including the wireless library used by the network module):
+On Debian-based systems, the following line installs all requirements,
+including the wireless library used by the network module:
 
 ```bash
 sudo apt-get install libconfuse-dev libyajl-dev libasound2-dev libiw-dev \
   asciidoc libpulse-dev libnl-genl-3-dev meson
 ```
+Note: autoconf is no longer needed — the build system moved to Meson.
+
 Upstream
-i3status is developed at https://github.com/i3/i3status
+- i3status is developed at https://github.com/i3/i3status
 
 Compilation
-Prefer installing i3status via your Linux distribution's package manager.
+- Prefer installing i3status via your Linux distribution's package manager.
 
 If you absolutely have to build from source, use:
 ```bash
@@ -67,27 +70,25 @@ ninja
 sudo ninja install
 ```
 Personal usage notes
-- Run i3status directly to see raw output, or point i3bar at it via
-status_command i3status in your i3 config.
+- Run directly to see raw output:
+```bash
+i3status
+```
+- Point i3bar at it via status_command i3status in your i3 config.
 
 - Config file: copy etc/i3status.conf to ~/.i3status.conf (or
 ~/.config/i3status/config) and edit the modules you need.
 
-- Test a config without restarting i3: i3status -c ~/.i3status.conf.
-
-- Validate build after changes:
-ninja -C build && ./build/i3status -c etc/i3status.conf.
-
+- Test a config without restarting i3:
+```bash
+i3status -c ~/.i3status.conf
+```
+- Validate the build after changes:
+```bash
+ninja -C build && ./build/i3status -c etc/i3status.conf
+```
 - Keep in sync with upstream:
 ```bash
 git remote add upstream https://github.com/i3/i3status
 git fetch upstream
 git rebase upstream/master
-```
-```
-
-This single file combines:
-- the original README description,
-- corrected dependencies and build instructions (Meson, no `autoconf`, `libiw-dev` and `meson` consistent),
-- fork identification plus review notes explaining how this repo differs from upstream,
-- personal usage notes (config location, testing, running, syncing with upstream).
