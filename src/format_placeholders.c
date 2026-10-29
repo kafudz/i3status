@@ -5,7 +5,7 @@
  * © 2009 Michael Stapelberg and contributors (see also: LICENSE)
  *
  */
-// copied from  i3:libi3/format_placeholders.c
+// copied from i3:libi3/format_placeholders.c
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
