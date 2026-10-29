@@ -4,12 +4,14 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <ifaddrs.h>
+
 #if defined(__OpenBSD__) || defined(__DragonFly__)
 #include <sys/types.h>
 #include <sys/sockio.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #endif
+
 #if defined(__OpenBSD__)
 #include <net80211/ieee80211.h>
 #include <net80211/ieee80211_ioctl.h>
@@ -76,11 +78,11 @@ static bool is_virtual(const char *ifname) {
 static net_type_t iface_type(const char *ifname) {
 #if defined(__OpenBSD__)
     /*
-     *First determine if the device is a wireless device by trying two ioctl(2)
+     * First determine if the device is a wireless device by trying two ioctl(2)
      * commands against it. If either succeeds we can be sure it's a wireless
      * device.
      * Otherwise we try another ioctl(2) to determine the interface media. If that
-     * fails it's not an ethernet device eiter.
+     * fails it's not an ethernet device either.
      */
     struct ifreq ifr;
     struct ieee80211_bssid bssid;
@@ -88,19 +90,23 @@ static net_type_t iface_type(const char *ifname) {
 #elif defined(__DragonFly__)
     struct ieee80211req ifr;
 #endif
+
 #if defined(__OpenBSD__) || defined(__DragonFly__)
     struct ifmediareq ifmr;
     int s;
 #endif
+
 #if defined(__OpenBSD__)
     int ibssid, inwid;
 #endif
+
 #if defined(__OpenBSD__) || defined(__DragonFly__)
     if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
         return NET_TYPE_OTHER;
 
     memset(&ifr, 0, sizeof(ifr));
 #endif
+
 #if defined(__OpenBSD__)
     ifr.ifr_data = (caddr_t)&nwid;
     (void)strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
@@ -122,6 +128,7 @@ static net_type_t iface_type(const char *ifname) {
         return NET_TYPE_WIRELESS;
     }
 #endif
+
 #if defined(__OpenBSD__) || defined(__DragonFly__)
     (void)memset(&ifmr, 0, sizeof(ifmr));
     (void)strlcpy(ifmr.ifm_name, ifname, sizeof(ifmr.ifm_name));
@@ -166,13 +173,13 @@ const char *first_eth_interface(const net_type_t type) {
 
     free(interface);
     interface = NULL;
-    for (addrp = ifaddr;
-         addrp != NULL;
-         addrp = addrp->ifa_next) {
+    
+    for (addrp = ifaddr; addrp != NULL; addrp = addrp->ifa_next) {
         if (strncasecmp(LOOPBACK_DEV, addrp->ifa_name, strlen(LOOPBACK_DEV)) == 0)
             continue;
         if (addrp->ifa_addr == NULL)
             continue;
+            
 #ifdef __OpenBSD__
         if (addrp->ifa_addr->sa_family != AF_LINK)
             continue;
@@ -183,12 +190,14 @@ const char *first_eth_interface(const net_type_t type) {
             addrp->ifa_addr->sa_family != AF_INET6)
             continue;
 #endif /* !__OpenBSD__ */
+        
         // Skip this interface if it is a wireless interface.
         iftype = iface_type(addrp->ifa_name);
         if (iftype != type)
             continue;
         if (is_virtual(addrp->ifa_name))
             continue;
+            
         interface = strdup(addrp->ifa_name);
         break;
     }
