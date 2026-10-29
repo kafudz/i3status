@@ -22,6 +22,10 @@ project(
 cc = meson.get_compiler('c')
 add_project_arguments(cc.get_supported_arguments(['-Wunused-value']), language: 'c')
 
+# Required for e.g. struct ucred to be defined as per unix(7). Added before any
+# compiler checks so that they see the same feature macros as the real build.
+add_project_arguments('-D_GNU_SOURCE', language: 'c')
+
 if meson.version().version_compare('>=0.48.0')
   # https://github.com/mesonbuild/meson/issues/2166#issuecomment-629696911
   meson.add_dist_script('meson/meson-dist-script')
@@ -35,16 +39,12 @@ endif
 
 cdata = configuration_data()
 
-version_array = meson.project_version().split('.')
 cdata.set_quoted('I3STATUS_VERSION', '@VCS_TAG@')
 cdata.set_quoted('SYSCONFDIR', join_paths(get_option('prefix'), get_option('sysconfdir')))
 
 if get_option('b_sanitize').split(',').contains('address')
   cdata.set('I3STATUS_ASAN_ENABLED', 1)
 endif
-
-cdata.set('HAVE_STRNDUP', cc.has_function('strndup'))
-cdata.set('HAVE_MKDIRP', cc.has_function('mkdirp'))
 
 if get_option('pulseaudio')
   cdata.set('HAS_PULSEAUDIO', 1)
@@ -81,8 +81,6 @@ if get_option('mans')
   )
 
   xmlto = find_program('xmlto')
-
-  pod2man = find_program('pod2man')
 
   man_inputs = [
     'man/i3status.man',
@@ -123,11 +121,15 @@ if get_option('mans')
   endforeach
 
 else
-  if run_command('[', '-f', 'man/i3status.1', ']', check: false).returncode() == 0
+  # Release tarballs ship a pre-generated manpage.
+  if meson.version().version_compare('>=0.53.0')
+    have_prebuilt_man = import('fs').exists('man/i3status.1')
+  else
+    have_prebuilt_man = run_command('test', '-f', 'man/i3status.1').returncode() == 0
+  endif
+  if have_prebuilt_man
     install_data(
-      [
-	'man/i3status.1',
-      ],
+      'man/i3status.1',
       install_dir: man1,
     )
   endif
@@ -137,9 +139,6 @@ if meson.version().version_compare('>=0.53')
   summary('build manpages (-Dmans)', get_option('mans'))
   summary('build pulseaudio support (-Dpulseaudio)', get_option('pulseaudio'))
 endif
-
-# Required for e.g. struct ucred to be defined as per unix(7).
-add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
 # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 m_dep = cc.find_library('m', required: false)
@@ -244,21 +243,26 @@ run_tests = custom_target(
   build_by_default: true,
 )
 
-perl = find_program('perl')
-if meson.version().version_compare('>=0.46.0')
-  test(
-    'run-tests',
-    perl,
-    args: [run_tests],
-    timeout: 120,  # Default of 30 seconds can cause timeouts on slower machines
-  )
+# perl is only needed to run the tests, not to build or install i3status.
+perl = find_program('perl', required: false)
+if perl.found()
+  if meson.version().version_compare('>=0.46.0')
+    test(
+      'run-tests',
+      perl,
+      args: [run_tests],
+      timeout: 120,  # Default of 30 seconds can cause timeouts on slower machines
+    )
+  else
+    # meson < 0.46.0 does not support the depends arg in test targets.
+    # Just hope for the best.
+    test(
+      'run-tests',
+      perl,
+      args: [run_tests],
+    )
+    message('meson < 0.46 detected, you might need to run ninja test twice')
+  endif
 else
-  # meson < 0.46.0 does not support the depends arg in test targets.
-  # Just hope for the best.
-  test(
-    'run-tests',
-    perl,
-    args: [run_tests],
-  )
-  message('meson < 0.46 detected, you might need to run ninja test twice')
+  message('perl not found, the test suite will not be available')
 endif
