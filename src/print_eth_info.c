@@ -25,7 +25,6 @@
 
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__)
 #include <net/if_media.h>
-
 #define PART_ETHSPEED "E: %s (%s)"
 #endif
 
@@ -54,8 +53,9 @@ static int print_eth_speed(char *outwalk, const char *interface) {
             return sprintf(outwalk, "%d Gbit/s", ethspeed / 1000);
         }
         return sprintf(outwalk, "%d Mbit/s", ethspeed);
-    } else
+    } else {
         return sprintf(outwalk, "?");
+    }
 #elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__)
     const char *ethspeed;
     struct ifmediareq ifm;
@@ -106,9 +106,9 @@ static int print_eth_speed(char *outwalk, const char *interface) {
 
     for (desc = ifm_subtype_descriptions; desc->ifmt_string != NULL; desc++) {
         /*
-		 * Skip these non-informative values and go right ahead to the
-		 * actual speeds.
-		 */
+         * Skip these non-informative values and go right ahead to the
+         * actual speeds.
+         */
         if (BEGINS_WITH(desc->ifmt_string, "autoselect") ||
             BEGINS_WITH(desc->ifmt_string, "auto"))
             continue;
@@ -119,7 +119,6 @@ static int print_eth_speed(char *outwalk, const char *interface) {
     }
     ethspeed = (desc->ifmt_string != NULL ? desc->ifmt_string : "?");
     return sprintf(outwalk, "%s", ethspeed);
-
 #else
     return sprintf(outwalk, "?");
 #endif
@@ -129,7 +128,7 @@ static int print_eth_speed(char *outwalk, const char *interface) {
  * Combines ethernet IP addresses and speed (if requested) for displaying
  *
  * Table summarizing what is the decision to prefer IPv4 or IPv6
- * based their values.
+ * based on their values.
  *
  * | ipv4_address | ipv6_address | Chosen IP | Color             |
  * |--------------|--------------|-----------|-------------------|
@@ -157,7 +156,7 @@ void print_eth_info(eth_info_ctx_t *ctx) {
     /*
      * Removing '%' and following characters from IPv6 since the interface identifier is redundant,
      * as the output already includes the interface name.
-    */
+     */
     if (ipv6_address != NULL) {
         char *prct_ptr = strstr(ipv6_address, "%");
         if (prct_ptr != NULL) {
@@ -192,13 +191,15 @@ void print_eth_info(eth_info_ctx_t *ctx) {
     snprintf(string_ip, STRING_SIZE, "%s", ip_address);
     print_eth_speed(string_speed, ctx->interface);
     snprintf(string_interface, STRING_SIZE, "%s", ctx->interface);
+    
     placeholder_t placeholders[] = {
         {.name = "%ip", .value = string_ip},
         {.name = "%speed", .value = string_speed},
-        {.name = "%interface", .value = string_interface}};
+        {.name = "%interface", .value = string_interface}
+    };
     num = sizeof(placeholders) / sizeof(placeholder_t);
 
-out : {
+out:
     char *formatted = format_placeholders(format, &placeholders[0], num);
     OUTPUT_FORMATTED;
     free(formatted);
@@ -207,5 +208,4 @@ out : {
     free(ipv4_address);
     free(ipv6_address);
     OUTPUT_FULL_TEXT(ctx->buf);
-}
 }
