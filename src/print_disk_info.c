@@ -5,9 +5,11 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/types.h>
+
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__OpenBSD__) || defined(__DragonFly__) || defined(__APPLE__)
 #include <sys/param.h>
 #include <sys/mount.h>
@@ -15,16 +17,14 @@
 #else
 #include <mntent.h>
 #endif
+
 #include <yajl/yajl_gen.h>
 #include <yajl/yajl_version.h>
-
 #include "i3status.h"
 
 #define STRING_SIZE 20
-
 #define BINARY_BASE UINT64_C(1024)
 #define DECIMAL_BASE UINT64_C(1000)
-
 #define MAX_EXPONENT 4
 
 static const char *const iec_symbols[MAX_EXPONENT + 1] = {"", "Ki", "Mi", "Gi", "Ti"};
@@ -33,7 +33,6 @@ static const char *const custom_symbols[MAX_EXPONENT + 1] = {"", "K", "M", "G", 
 
 /*
  * Formats bytes according to the given base and set of symbols.
- *
  */
 static int format_bytes(char *outwalk, uint64_t bytes, uint64_t base, const char *const symbols[]) {
     double size = bytes;
@@ -47,7 +46,6 @@ static int format_bytes(char *outwalk, uint64_t bytes, uint64_t base, const char
 
 /*
  * Prints the given amount of bytes in a human readable manner.
- *
  */
 static int print_bytes_human(char *outwalk, uint64_t bytes, const char *prefix_type) {
     if (strcasecmp(prefix_type, "decimal") == 0) {
@@ -61,7 +59,6 @@ static int print_bytes_human(char *outwalk, uint64_t bytes, const char *prefix_t
 
 /*
  * Determines whether remaining bytes are below given threshold.
- *
  */
 #if defined(__DragonFly__) || defined(__APPLE__)
 static bool below_threshold(struct statfs buf, const char *prefix_type, const char *threshold_type, const double low_threshold) {
@@ -122,7 +119,6 @@ static bool below_threshold(struct statvfs buf, const char *prefix_type, const c
 /*
  * Does a statvfs and prints either free, used or total amounts of bytes in a
  * human readable manner.
- *
  */
 void print_disk_info(disk_info_ctx_t *ctx) {
     const char *selected_format = ctx->format;
@@ -134,21 +130,16 @@ void print_disk_info(disk_info_ctx_t *ctx) {
 
 #if defined(__DragonFly__) || defined(__APPLE__)
     struct statfs buf;
-
-    if (statfs(path, &buf) == -1)
+    if (statfs(ctx->path, &buf) == -1)
         return;
-
     mounted = true;
 #elif defined(__NetBSD__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__OpenBSD__)
     struct statvfs buf;
-
     if (statvfs(ctx->path, &buf) == -1)
         return;
-
     mounted = true;
 #else
     struct statvfs buf;
-
     if (statvfs(ctx->path, &buf) == -1) {
         /* If statvfs errors, e.g., due to the path not existing,
          * we consider the device not mounted. */
@@ -157,6 +148,7 @@ void print_disk_info(disk_info_ctx_t *ctx) {
         char *sanitized = sstrdup(ctx->path);
         if (strlen(sanitized) > 1 && sanitized[strlen(sanitized) - 1] == '/')
             sanitized[strlen(sanitized) - 1] = '\0';
+        
         FILE *mntentfile = setmntent("/etc/mtab", "r");
         if (mntentfile == NULL) {
             mntentfile = setmntent("/proc/mounts", "r");
@@ -165,7 +157,6 @@ void print_disk_info(disk_info_ctx_t *ctx) {
             fprintf(stderr, "i3status: files /etc/mtab and /proc/mounts aren't accessible\n");
         } else {
             struct mntent *m;
-
             while ((m = getmntent(mntentfile)) != NULL) {
                 if (strcmp(m->mnt_dir, sanitized) == 0) {
                     mounted = true;
@@ -209,6 +200,7 @@ void print_disk_info(disk_info_ctx_t *ctx) {
     print_bytes_human(string_total, (uint64_t)buf.f_frsize * (uint64_t)buf.f_blocks, ctx->prefix_type);
     print_bytes_human(string_avail, (uint64_t)buf.f_frsize * (uint64_t)buf.f_bavail, ctx->prefix_type);
 #endif
+
     snprintf(string_percentage_free, STRING_SIZE, "%.01f%s", 100.0 * (double)buf.f_bfree / (double)buf.f_blocks, pct_mark);
     snprintf(string_percentage_used_of_avail, STRING_SIZE, "%.01f%s", 100.0 * (double)(buf.f_blocks - buf.f_bavail) / (double)buf.f_blocks, pct_mark);
     snprintf(string_percentage_used, STRING_SIZE, "%.01f%s", 100.0 * (double)(buf.f_blocks - buf.f_bfree) / (double)buf.f_blocks, pct_mark);
@@ -222,7 +214,8 @@ void print_disk_info(disk_info_ctx_t *ctx) {
         {.name = "%percentage_free", .value = string_percentage_free},
         {.name = "%percentage_used_of_avail", .value = string_percentage_used_of_avail},
         {.name = "%percentage_used", .value = string_percentage_used},
-        {.name = "%percentage_avail", .value = string_percentage_avail}};
+        {.name = "%percentage_avail", .value = string_percentage_avail}
+    };
 
     const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
     char *formatted = format_placeholders(selected_format, &placeholders[0], num);
