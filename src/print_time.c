@@ -14,8 +14,14 @@
 #define TIME_STRING_SIZE 4096
 
 static bool tz_snapshot_taken = false;
+/* TZ as it was when i3status started (NULL if unset). Allocated once and
+ * kept for the lifetime of the process, so it is "still reachable", not a
+ * leak. */
 static char *saved_tz = NULL;
-static const char *active_tz = NULL;
+/* The TZ value we last applied. This is our own copy: storing the caller's
+ * pointer (a libconfuse string or saved_tz) would dangle as soon as its
+ * owner is freed. */
+static char *active_tz = NULL;
 
 void set_timezone(const char *tz) {
     if (!tz_snapshot_taken) {
@@ -35,7 +41,9 @@ void set_timezone(const char *tz) {
             setenv("TZ", tz, 1);
         else
             unsetenv("TZ");
-        active_tz = tz;
+        char *copy = sstrdup(tz); /* NULL stays NULL */
+        free(active_tz);
+        active_tz = copy;
     }
     tzset();
 }
@@ -67,15 +75,19 @@ static char *append_clamped(char *outwalk, char *buf, size_t buflen,
 void print_time(time_ctx_t *ctx) {
     char *outwalk = ctx->buf;
     struct tm local_tm, tm;
+    memset(&local_tm, 0, sizeof(local_tm));
+    memset(&tm, 0, sizeof(tm));
 
     if (ctx->title != NULL)
-        INSTANCE(ctx->title);   /* no cast: INSTANCE caches + casts per-use */
+        INSTANCE(ctx->title);
 
     set_timezone(NULL);
-    localtime_r(&ctx->t, &local_tm);
+    if (localtime_r(&ctx->t, &local_tm) == NULL)
+        goto error;
 
     set_timezone(ctx->tz);
-    localtime_r(&ctx->t, &tm);
+    if (localtime_r(&ctx->t, &tm) == NULL)
+        goto error;
 
     bool hide = false;
     if (ctx->hide_if_equals_localtime) {
@@ -115,7 +127,7 @@ void print_time(time_ctx_t *ctx) {
     } else {
         const size_t written =
             strftime(string_time, sizeof(string_time), ctx->format_time, &tm);
-        if (written == 0 && ctx->format_time[0] != '\0') {
+        if (written == 0) {
             outwalk = append_clamped(outwalk, ctx->buf, ctx->buflen,
                                      "i3status: time format output too large");
         } else {
@@ -124,8 +136,14 @@ void print_time(time_ctx_t *ctx) {
             const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
             char *formatted =
                 format_placeholders(ctx->format, placeholders, num);
-            OUTPUT_FORMATTED;
-            free(formatted);
+            if (formatted != NULL) {
+                /* OUTPUT_FORMATTED is not used here: it advances outwalk by
+                 * strlen(formatted) even when strncpy truncated, which puts
+                 * outwalk past the buffer for long results. */
+                outwalk = append_clamped(outwalk, ctx->buf, ctx->buflen,
+                                         formatted);
+                free(formatted);
+            }
         }
     }
 
@@ -135,6 +153,13 @@ void print_time(time_ctx_t *ctx) {
     }
 
 out:
+    *outwalk = '\0';
+    OUTPUT_FULL_TEXT(ctx->buf);
+    return;
+
+error:
+    outwalk = append_clamped(ctx->buf, ctx->buf, ctx->buflen,
+                             "i3status: cannot convert time");
     *outwalk = '\0';
     OUTPUT_FULL_TEXT(ctx->buf);
 }
