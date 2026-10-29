@@ -495,8 +495,9 @@ error1:
     return 0;
 }
 
-/* Table summarizing what is the decision to prefer IPv4 or IPv6
- * based their values.
+/*
+ * Table summarizing what is the decision to prefer IPv4 or IPv6
+ * based on their values.
  *
  * | ipv4_address | ipv6_address | Chosen IP | Color             |
  * |--------------|--------------|-----------|-------------------|
@@ -626,7 +627,8 @@ void print_wireless_info(wireless_info_ctx_t *ctx) {
         {.name = "%essid", .value = string_essid},
         {.name = "%frequency", .value = string_frequency},
         {.name = "%ip", .value = string_ip},
-        {.name = "%bitrate", .value = string_bitrate}};
+        {.name = "%bitrate", .value = string_bitrate}
+    };
 
     const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
     char *formatted = format_placeholders(walk, &placeholders[0], num);
