@@ -13,10 +13,11 @@ project(
     # TODO(https://github.com/i3/i3/issues/4087): switch to
     # 'buildtype=debugoptimized',
   ],
-  # Ubuntu 18.04 (supported until 2023) has meson 0.45.
+  # The check: keyword of run_command() needs meson 0.47. Ubuntu 18.04
+  # (meson 0.45) is no longer supported.
   # We can revisit our minimum supported meson version
   # if it turns out to be too hard to maintain.
-  meson_version: '>=0.45.0',
+  meson_version: '>=0.47.0',
 )
 
 cc = meson.get_compiler('c')
@@ -123,7 +124,7 @@ if get_option('mans')
   endforeach
 
 else
-  if run_command('[', '-f', 'man/i3status.1', ']').returncode() == 0
+  if run_command('[', '-f', 'man/i3status.1', ']', check: false).returncode() == 0
     install_data(
       [
 	'man/i3status.1',
