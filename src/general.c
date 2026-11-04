@@ -52,7 +52,8 @@ bool slurp(const char *filename, char *destination, int size) {
  */
 char *resolve_tilde(const char *path) {
     glob_t globbuf;
-    char *head, *tail, *result = NULL;
+    char *head, *result = NULL;
+    const char *tail;
 
     memset(&globbuf, 0, sizeof(globbuf));
 
