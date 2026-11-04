@@ -50,7 +50,21 @@
         ctx->fmt = ctx->fmt_muted;                                                       \
     }
 
-static char *apply_volume_format(const char *fmt, int ivolume, const char *devicename) {
+/*
+ * Picks the icon for %icon: the muted icon when muted, otherwise one of the
+ * low/medium/high icons depending on the volume (below 34%, below 67%, above).
+ */
+static const char *volume_icon(const volume_ctx_t *ctx, int ivolume, bool muted) {
+    if (muted)
+        return ctx->icon_muted;
+    if (ivolume < 34)
+        return ctx->icon_low;
+    if (ivolume < 67)
+        return ctx->icon_medium;
+    return ctx->icon_high;
+}
+
+static char *apply_volume_format(const volume_ctx_t *ctx, const char *fmt, int ivolume, bool muted, const char *devicename) {
     char string_volume[STRING_SIZE];
 
     snprintf(string_volume, STRING_SIZE, "%d%s", ivolume, pct_mark);
@@ -58,7 +72,8 @@ static char *apply_volume_format(const char *fmt, int ivolume, const char *devic
     placeholder_t placeholders[] = {
         {.name = "%%", .value = pct_mark},
         {.name = "%volume", .value = string_volume},
-        {.name = "%devicename", .value = devicename}};
+        {.name = "%devicename", .value = devicename},
+        {.name = "%icon", .value = volume_icon(ctx, ivolume, muted)}};
 
     const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
     return format_placeholders(fmt, &placeholders[0], num);
@@ -110,8 +125,8 @@ void print_volume(volume_ctx_t *ctx) {
         /* negative result means error, stick to 0 */
         if (ivolume < 0)
             ivolume = 0;
-        char *formatted = apply_volume_format(muted ? ctx->fmt_muted : ctx->fmt,
-                                              ivolume,
+        char *formatted = apply_volume_format(ctx, muted ? ctx->fmt_muted : ctx->fmt,
+                                              ivolume, muted,
                                               description);
         OUTPUT_FORMATTED;
         free(formatted);
@@ -128,8 +143,8 @@ void print_volume(volume_ctx_t *ctx) {
                 START_COLOR("color_degraded");
                 pbval = 0;
             }
-            char *formatted = apply_volume_format(muted ? ctx->fmt_muted : ctx->fmt,
-                                                  ivolume,
+            char *formatted = apply_volume_format(ctx, muted ? ctx->fmt_muted : ctx->fmt,
+                                                  ivolume, muted,
                                                   description);
             OUTPUT_FORMATTED;
             free(formatted);
@@ -244,7 +259,7 @@ void print_volume(volume_ctx_t *ctx) {
         ALSA_MUTE_SWITCH(capture)
     }
 
-    char *formatted = apply_volume_format(ctx->fmt, avg, mixer_name);
+    char *formatted = apply_volume_format(ctx, ctx->fmt, avg, pbval == 0, mixer_name);
     OUTPUT_FORMATTED;
     free(formatted);
 
@@ -361,7 +376,7 @@ void print_volume(volume_ctx_t *ctx) {
     }
 
 #endif
-    ctx->buf = apply_volume_format(ctx->fmt, vol & 0x7f, devicename);
+    ctx->buf = apply_volume_format(ctx, ctx->fmt, vol & 0x7f, pbval == 0, devicename);
     close(mixfd);
     goto out_with_format;
 #endif

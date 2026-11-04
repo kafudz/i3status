@@ -431,6 +431,10 @@ typedef struct {
     const size_t buflen;
     const char *fmt;
     const char *fmt_muted;
+    const char *icon_muted;
+    const char *icon_low;
+    const char *icon_medium;
+    const char *icon_high;
     const char *device;
     const char *mixer;
     int mixer_idx;
