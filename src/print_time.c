@@ -83,11 +83,19 @@ void print_time(time_ctx_t *ctx) {
 
     set_timezone(NULL);
     if (localtime_r(&ctx->t, &local_tm) == NULL)
+<<<<<<< HEAD
         goto error;
 
     set_timezone(ctx->tz);
     if (localtime_r(&ctx->t, &tm) == NULL)
         goto error;
+=======
+        goto out;
+
+    set_timezone(ctx->tz);
+    if (localtime_r(&ctx->t, &tm) == NULL)
+        goto out;
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     bool hide = false;
     if (ctx->hide_if_equals_localtime) {
@@ -112,6 +120,7 @@ void print_time(time_ctx_t *ctx) {
 
     char string_time[TIME_STRING_SIZE];
 
+<<<<<<< HEAD
     if (ctx->format_time == NULL || ctx->format_time[0] == '\0') {
         if (ctx->format[0] == '\0') {
             /* nothing to print */
@@ -124,6 +133,12 @@ void print_time(time_ctx_t *ctx) {
             else
                 outwalk += written;
         }
+=======
+    char string_time[STRING_SIZE];
+
+    if (ctx->format_time == NULL) {
+        outwalk += strftime(ctx->buf, ctx->buflen, ctx->format, &tm);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     } else {
         const size_t written =
             strftime(string_time, sizeof(string_time), ctx->format_time, &tm);

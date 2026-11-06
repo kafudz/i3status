@@ -221,15 +221,31 @@ void print_cpu_temperature_info(cpu_temperature_ctx_t *ctx) {
     temperature.raw_value = 0;
     sprintf(temperature.formatted_value, "%.2f", 0.0);
 
+<<<<<<< HEAD
     if (ctx->path == NULL) {
         if (asprintf(&thermal_zone, THERMAL_ZONE, ctx->zone) == -1)
             goto error;
     } else {
         static glob_t globbuf;
         if (glob(ctx->path, GLOB_NOCHECK | GLOB_TILDE, NULL, &globbuf) != 0)
+=======
+    int asprintf_result;
+    if (ctx->path == NULL)
+        asprintf_result = asprintf(&thermal_zone, THERMAL_ZONE, ctx->zone);
+    else {
+        glob_t globbuf;
+        memset(&globbuf, 0, sizeof(globbuf));
+        /* Deliberately no GLOB_NOCHECK: it makes glob() return the pattern
+         * itself when nothing matches, so a path that is a printf format
+         * (e.g. ".../thermal_zone%d/temp") would never get its zone number
+         * substituted. */
+        int glob_result = glob(ctx->path, GLOB_TILDE, NULL, &globbuf);
+        if (glob_result != 0 && glob_result != GLOB_NOMATCH)
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
             die("glob() failed\n");
-        if (globbuf.gl_pathc == 0) {
+        if (glob_result == GLOB_NOMATCH || globbuf.gl_pathc == 0) {
             /* No glob matches, the specified path does not contain a wildcard. */
+<<<<<<< HEAD
             if (asprintf(&thermal_zone, ctx->path, ctx->zone) == -1) {
                 globfree(&globbuf);
                 goto error;
@@ -240,9 +256,17 @@ void print_cpu_temperature_info(cpu_temperature_ctx_t *ctx) {
                 globfree(&globbuf);
                 goto error;
             }
+=======
+            asprintf_result = asprintf(&thermal_zone, ctx->path, ctx->zone);
+        } else {
+            /* glob matched, we take the first match and ignore the others */
+            asprintf_result = asprintf(&thermal_zone, "%s", globbuf.gl_pathv[0]);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         }
         globfree(&globbuf);
     }
+    if (asprintf_result == -1)
+        die("asprintf() failed\n");
 
     INSTANCE(thermal_zone);
 

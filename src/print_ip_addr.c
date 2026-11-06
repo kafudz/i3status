@@ -54,9 +54,15 @@ const char *get_ip_addr(const char *interface, int family) {
     struct ifaddrs *ifaddr, *addrp;
     bool found = false;
 
+<<<<<<< HEAD
     getifaddrs(&ifaddr);
 
     if (ifaddr == NULL) {
+=======
+    /* On failure the pointer is left undefined, so the result has to be
+     * checked rather than the pointer. */
+    if (getifaddrs(&ifaddr) == -1 || ifaddr == NULL)
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         return NULL;
     }
 

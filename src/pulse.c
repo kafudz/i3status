@@ -94,6 +94,7 @@ static bool save_info(uint32_t sink_idx, int new_volume, const char *new_descrip
     }
 
     /* index not found, store it */
+<<<<<<< HEAD
     entry = malloc(sizeof(*entry));
     if (!entry) {
         pthread_mutex_unlock(&pulse_mutex);
@@ -101,11 +102,16 @@ static bool save_info(uint32_t sink_idx, int new_volume, const char *new_descrip
         return false;
     }
 
+=======
+    entry = scalloc(sizeof(*entry));
+    TAILQ_INSERT_HEAD(&cached_info, entry, entries);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     entry->idx = sink_idx;
     entry->volume = new_volume;
     entry->description[0] = '\0';
     strncpy(entry->description, new_description, sizeof(entry->description) - 1);
     entry->description[sizeof(entry->description) - 1] = '\0';
+<<<<<<< HEAD
 
     if (name) {
         entry->name = strdup(name);
@@ -121,6 +127,10 @@ static bool save_info(uint32_t sink_idx, int new_volume, const char *new_descrip
 
     /* insert only after all fields are fully initialized */
     TAILQ_INSERT_HEAD(&cached_info, entry, entries);
+=======
+    /* sstrdup() passes NULL through, so this covers "no name" as well. */
+    entry->name = sstrdup(name);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     pthread_mutex_unlock(&pulse_mutex);
     return true;
 }

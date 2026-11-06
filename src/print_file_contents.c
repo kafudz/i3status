@@ -6,6 +6,10 @@
 #include <yajl/yajl_gen.h>
 #include <yajl/yajl_version.h>
 #include <sys/types.h>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -36,6 +40,7 @@ void print_file_contents(file_contents_ctx_t *ctx) {
 
     if (ctx->path == NULL) {
         OUTPUT_FULL_TEXT("error: path not configured");
+<<<<<<< HEAD
         return;
     }
     if (ctx->max_chars <= 0) {
@@ -68,11 +73,39 @@ void print_file_contents(file_contents_ctx_t *ctx) {
         if (n < 0)
             err = errno;
         else
+=======
+        return;
+    }
+
+    /* A negative max_characters would otherwise turn into a gigantic
+     * allocation. */
+    const size_t max_chars = ctx->max_chars > 0 ? (size_t)ctx->max_chars : 0;
+    char *buf = scalloc(max_chars + 1);
+
+    char *abs_path = resolve_tilde(ctx->path);
+    int fd = open(abs_path, O_RDONLY);
+    /* Remember the error right away: it is what %errno and %error show, and
+     * nothing that runs later may be allowed to overwrite it. */
+    int saved_errno = (fd == -1) ? errno : 0;
+    free(abs_path);
+
+    INSTANCE(ctx->path);
+
+    if (fd != -1) {
+        ssize_t n = read(fd, buf, max_chars);
+        if (n == -1) {
+            saved_errno = errno;
+        } else {
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
             buf[n] = '\0';
         (void)close(fd);
     }
 
+<<<<<<< HEAD
     if (err == 0) {
+=======
+    if (saved_errno == 0) {
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         START_COLOR("color_good");
     } else {
         walk = ctx->format_bad;
@@ -90,13 +123,22 @@ void print_file_contents(file_contents_ctx_t *ctx) {
     *dst = '\0';
 
     char string_errno[STRING_SIZE];
+<<<<<<< HEAD
     snprintf(string_errno, sizeof(string_errno), "%d", err);
+=======
+
+    snprintf(string_errno, sizeof(string_errno), "%d", saved_errno);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     placeholder_t placeholders[] = {
         {.name = "%title", .value = ctx->title ? ctx->title : ""},
         {.name = "%content", .value = buf},
         {.name = "%errno", .value = string_errno},
+<<<<<<< HEAD
         {.name = "%error", .value = strerror(err)}};
+=======
+        {.name = "%error", .value = strerror(saved_errno)}};
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
     char *formatted = format_placeholders(walk, &placeholders[0], num);

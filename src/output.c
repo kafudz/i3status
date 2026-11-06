@@ -48,6 +48,7 @@ char *color(const char *colorstr) {
     else if (output_format == O_TERM) {
         /* The escape-sequence for color is <CSI><col>;1m (bright/bold
          * output), where col is a 3-bit rgb-value with b in the
+<<<<<<< HEAD
          * least-significant bit.  We round the given color to the nearest
          * 3-bit-depth color and output the escape-sequence.
          *
@@ -61,6 +62,21 @@ char *color(const char *colorstr) {
         int blue = (rgb & (0xFF << 0)) ? 1 : 0;
         int col = (red << 2) | (green << 1) | blue;
         (void)snprintf(colorbuf, COLOR_BUF_SIZE, "\033[3%d;1m", col);
+=======
+         * least-significant bit. We round the given color to the
+         * nearist 3-bit-depth color and output the escape-sequence */
+        char *str = cfg_getstr(cfg_general, colorstr);
+        int col = strtol(str + 1, NULL, 16);
+        int r = (col & (0xFF << 0)) / 0x80;
+        int g = (col & (0xFF << 8)) / 0x8000;
+        int b = (col & (0xFF << 16)) / 0x800000;
+        col = (r << 2) | (g << 1) | b;
+        (void)snprintf(colorbuf, sizeof(colorbuf), "\033[3%d;1m", col);
+    } else {
+        /* No color support for this output format: never hand back stale
+         * content from an earlier call. */
+        colorbuf[0] = '\0';
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     }
 
     return colorbuf;
@@ -103,11 +119,27 @@ void reset_cursor(void) {
 }
 
 /*
+ * Appends the NUL-terminated string `str` at offset *pos of `buffer`, but only
+ * if it fits completely (leaving room for the terminating NUL byte). Returns
+ * false, without writing anything, if it does not fit.
+ */
+static bool append_whole(char *buffer, size_t size, size_t *pos, const char *str) {
+    const size_t len = strlen(str);
+    if (*pos + len >= size) {
+        return false;
+    }
+    memcpy(&buffer[*pos], str, len);
+    *pos += len;
+    return true;
+}
+
+/*
  * Escapes ampersand, less-than, greater-than, single-quote, and double-quote
  * characters with the corresponding Pango markup strings if markup is enabled.
  * See the glib implementation:
  * https://git.gnome.org/browse/glib/tree/glib/gmarkup.c?id=03db1f455b4265654e237d2ad55464b4113cba8a#n2142
  *
+<<<<<<< HEAD
  * `buffer` is always NUL-terminated on return, even when the escaped text
  * does not fit; in that case the output is truncated at an entity boundary.
  */
@@ -117,6 +149,16 @@ void maybe_escape_markup(char *text, char *buffer, size_t size) {
 
     /* Maximum number of characters we may write, excluding the NUL. */
     const size_t cap = size - 1;
+=======
+ * The result is always NUL-terminated and is truncated at an entity boundary,
+ * so it never ends in a half-written entity such as "&am".
+ *
+ */
+void maybe_escape_markup(const char *text, char *buffer, size_t size) {
+    if (size == 0) {
+        return;
+    }
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     if (markup_format == M_NONE) {
         size_t n = strlen(text);
@@ -128,6 +170,7 @@ void maybe_escape_markup(char *text, char *buffer, size_t size) {
     }
 
     size_t i = 0;
+<<<<<<< HEAD
     for (; *text != '\0' && i < cap; text++) {
         size_t avail = cap - i; /* >= 1 */
         int written = 0;
@@ -157,10 +200,43 @@ void maybe_escape_markup(char *text, char *buffer, size_t size) {
                     buffer[i] = *text;
                     i++;
                     continue;
+=======
+    for (; *text != '\0'; text++) {
+        const unsigned char c = (unsigned char)*text;
+        char single[2] = {(char)c, '\0'};
+        char numeric[16];
+        const char *replacement;
+
+        switch (c) {
+            case '&':
+                replacement = "&amp;";
+                break;
+            case '<':
+                replacement = "&lt;";
+                break;
+            case '>':
+                replacement = "&gt;";
+                break;
+            case '\'':
+                replacement = "&apos;";
+                break;
+            case '"':
+                replacement = "&quot;";
+                break;
+            default:
+                if ((0x1 <= c && c <= 0x8) ||
+                    (0xb <= c && c <= 0xc) ||
+                    (0xe <= c && c <= 0x1f)) {
+                    snprintf(numeric, sizeof(numeric), "&#x%x;", (unsigned int)c);
+                    replacement = numeric;
+                } else {
+                    replacement = single;
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
                 }
                 break;
         }
 
+<<<<<<< HEAD
         /*
          * snprintf() returns the would-be length.  If it exceeds `avail`,
          * the entity was truncated; we stop here so we never emit a broken
@@ -174,6 +250,12 @@ void maybe_escape_markup(char *text, char *buffer, size_t size) {
         i += (size_t)written;
     }
 
+=======
+        if (!append_whole(buffer, size, &i, replacement)) {
+            break;
+        }
+    }
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     buffer[i] = '\0';
 }
 
@@ -185,6 +267,11 @@ void maybe_escape_markup(char *text, char *buffer, size_t size) {
  * behavior per POSIX.
  */
 char *ltrim(const char *s) {
+<<<<<<< HEAD
+=======
+    if (s == NULL)
+        return NULL;
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     while (isspace((unsigned char)*s))
         ++s;
     return sstrdup(s);
@@ -195,6 +282,7 @@ char *ltrim(const char *s) {
  */
 char *rtrim(const char *s) {
     char *r = sstrdup(s);
+<<<<<<< HEAD
     if (r == NULL)
         return NULL;
 
@@ -213,6 +301,14 @@ char *rtrim(const char *s) {
         --end;
     *(end + 1) = '\0';
 
+=======
+    if (r != NULL) {
+        size_t len = strlen(r);
+        while (len > 0 && isspace((unsigned char)r[len - 1]))
+            --len;
+        r[len] = '\0';
+    }
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     return r;
 }
 

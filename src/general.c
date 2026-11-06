@@ -8,7 +8,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <glob.h>
+<<<<<<< HEAD
 #include <fcntl.h>    /* was <sys/fcntl.h> — nonstandard alias */
+=======
+#include <fcntl.h>
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 #include <sys/stat.h>
 
 #include "i3status.h"
@@ -35,6 +39,7 @@ bool slurp(const char *filename, char *destination, int size) {
     if (destination == NULL || size <= 0)
         return false;
 
+<<<<<<< HEAD
     int fd;
     if ((fd = open(filename, O_RDONLY)) == -1)
         return false;
@@ -46,6 +51,17 @@ bool slurp(const char *filename, char *destination, int size) {
     } while (n == -1 && errno == EINTR);
 
     if (n >= 0)
+=======
+    /* We need at least one byte for the trailing 0 byte */
+    if (size < 1)
+        return false;
+
+    if ((fd = open(filename, O_RDONLY)) == -1)
+        return false;
+
+    ssize_t n = read(fd, destination, size - 1);
+    if (n != -1)
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         destination[n] = '\0';
     (void)close(fd);
 
@@ -60,6 +76,7 @@ bool slurp(const char *filename, char *destination, int size) {
  * The caller owns the returned string and must free() it.
  */
 char *resolve_tilde(const char *path) {
+<<<<<<< HEAD
     /*
      * Use a *local* glob_t, not a static one: a static would be shared
      * across calls and make globfree() on a partially-initialized struct
@@ -75,12 +92,23 @@ char *resolve_tilde(const char *path) {
     size_t head_len = tail ? (size_t)(tail - path) : strlen(path);
 
     char *head = strndup(path, head_len);
+=======
+    glob_t globbuf;
+    char *head, *result = NULL;
+    const char *tail;
+
+    memset(&globbuf, 0, sizeof(globbuf));
+
+    tail = strchr(path, '/');
+    head = strndup(path, tail ? (size_t)(tail - path) : strlen(path));
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     if (head == NULL)
         die("Error: out of memory (strndup())\n");
 
     int res = glob(head, GLOB_TILDE, NULL, &globbuf);
     free(head);
 
+<<<<<<< HEAD
     if (res == GLOB_NOMATCH || globbuf.gl_pathc != 1) {
         /* No match, or many wildcard matches: use the path unchanged. */
         result = sstrdup(path);
@@ -88,6 +116,11 @@ char *resolve_tilde(const char *path) {
         /* GLOB_ABORTED, GLOB_NOSPACE, or an unknown error. */
         globfree(&globbuf);
         die("glob() failed");
+=======
+    /* no match, an error, or many wildcard matches: keep the path as given */
+    if (res != 0 || globbuf.gl_pathc != 1) {
+        result = sstrdup(path);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     } else {
         const char *expanded = globbuf.gl_pathv[0];
         size_t total = strlen(expanded) + (tail ? strlen(tail) : 0);

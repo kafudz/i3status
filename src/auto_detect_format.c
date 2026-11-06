@@ -45,17 +45,31 @@ static bool parse_proc_stat(pid_t pid, char **outname, pid_t *outppid) {
 
     char *leftbracket = strchr(buffer, '(');
     char *rightbracket = strrchr(buffer, ')');
+<<<<<<< HEAD
     if (!leftbracket || !rightbracket || rightbracket <= leftbracket)
+=======
+    /* The state and parent pid follow the closing bracket after a space, so
+     * there has to be more than a single character behind it. */
+    if (!leftbracket ||
+        !rightbracket ||
+        rightbracket < leftbracket ||
+        rightbracket[1] == '\0' ||
+        sscanf(rightbracket + 2, "%*c %d", outppid) != 1)
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         return false;
     if (sscanf(rightbracket + 2, "%*c %d", outppid) != 1)
         return false;
 
     *rightbracket = '\0';
+<<<<<<< HEAD
     char *name = strdup(leftbracket + 1);
     if (name == NULL)
         return false;
 
     *outname = name;
+=======
+    *outname = sstrdup(leftbracket + 1);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     return true;
 }
 

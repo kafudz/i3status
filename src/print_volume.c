@@ -50,7 +50,21 @@
         ctx->fmt = ctx->fmt_muted;                                                       \
     }
 
-static char *apply_volume_format(const char *fmt, int ivolume, const char *devicename) {
+/*
+ * Picks the icon for %icon: the muted icon when muted, otherwise one of the
+ * low/medium/high icons depending on the volume (below 34%, below 67%, above).
+ */
+static const char *volume_icon(const volume_ctx_t *ctx, int ivolume, bool muted) {
+    if (muted)
+        return ctx->icon_muted;
+    if (ivolume < 34)
+        return ctx->icon_low;
+    if (ivolume < 67)
+        return ctx->icon_medium;
+    return ctx->icon_high;
+}
+
+static char *apply_volume_format(const volume_ctx_t *ctx, const char *fmt, int ivolume, bool muted, const char *devicename) {
     char string_volume[STRING_SIZE];
 
     snprintf(string_volume, STRING_SIZE, "%d%s", ivolume, pct_mark);
@@ -58,7 +72,8 @@ static char *apply_volume_format(const char *fmt, int ivolume, const char *devic
     placeholder_t placeholders[] = {
         {.name = "%%", .value = pct_mark},
         {.name = "%volume", .value = string_volume},
-        {.name = "%devicename", .value = devicename}};
+        {.name = "%devicename", .value = devicename},
+        {.name = "%icon", .value = volume_icon(ctx, ivolume, muted)}};
 
     const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
     return format_placeholders(fmt, &placeholders[0], num);
@@ -71,7 +86,11 @@ void print_volume(volume_ctx_t *ctx) {
     if (output_format == O_I3BAR) {
         char *instance;
         if (asprintf(&instance, "%s.%s.%d", ctx->device, ctx->mixer, ctx->mixer_idx) == -1)
+<<<<<<< HEAD
             goto out;
+=======
+            die("asprintf() failed\n");
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         INSTANCE(instance);
         free(instance);
     }
@@ -109,8 +128,8 @@ void print_volume(volume_ctx_t *ctx) {
         /* negative result means error, stick to 0 */
         if (ivolume < 0)
             ivolume = 0;
-        char *formatted = apply_volume_format(muted ? ctx->fmt_muted : ctx->fmt,
-                                              ivolume,
+        char *formatted = apply_volume_format(ctx, muted ? ctx->fmt_muted : ctx->fmt,
+                                              ivolume, muted,
                                               description);
         OUTPUT_FORMATTED;
         free(formatted);
@@ -127,8 +146,8 @@ void print_volume(volume_ctx_t *ctx) {
                 START_COLOR("color_degraded");
                 pbval = 0;
             }
-            char *formatted = apply_volume_format(muted ? ctx->fmt_muted : ctx->fmt,
-                                                  ivolume,
+            char *formatted = apply_volume_format(ctx, muted ? ctx->fmt_muted : ctx->fmt,
+                                                  ivolume, muted,
                                                   description);
             OUTPUT_FORMATTED;
             free(formatted);
@@ -203,17 +222,26 @@ void print_volume(volume_ctx_t *ctx) {
 
     if (err != 0) {
         fprintf(stderr, "i3status: ALSA: Cannot get playback volume.\n");
+        /* We run once per interval: always release the mixer, or every
+         * failure leaks a handle (and its file descriptors). */
+        snd_mixer_close(m);
+        snd_mixer_selem_id_free(sid);
         goto out;
     }
 
     mixer_name = snd_mixer_selem_get_name(elem);
     if (!mixer_name) {
         fprintf(stderr, "i3status: ALSA: NULL mixer_name.\n");
+        snd_mixer_close(m);
+        snd_mixer_selem_id_free(sid);
         goto out;
     }
 
-    /* Use linear mapping for raw register values or small ranges of 24 dB */
-    if (force_linear || max - min <= MAX_LINEAR_DB_SCALE * 100) {
+    if (max == min) {
+        /* A degenerate range cannot be turned into a percentage. */
+        avg = 0;
+    } else if (force_linear || max - min <= MAX_LINEAR_DB_SCALE * 100) {
+        /* Use linear mapping for raw register values or small ranges of 24 dB */
         float avgf = ((float)(val - min) / (max - min)) * 100;
         avg = (int)avgf;
         avg = (avgf - avg < 0.5 ? avg : (avg + 1));
@@ -234,7 +262,7 @@ void print_volume(volume_ctx_t *ctx) {
         ALSA_MUTE_SWITCH(capture)
     }
 
-    char *formatted = apply_volume_format(ctx->fmt, avg, mixer_name);
+    char *formatted = apply_volume_format(ctx, ctx->fmt, avg, pbval == 0, mixer_name);
     OUTPUT_FORMATTED;
     free(formatted);
 
@@ -351,7 +379,7 @@ void print_volume(volume_ctx_t *ctx) {
     }
 
 #endif
-    ctx->buf = apply_volume_format(ctx->fmt, vol & 0x7f, devicename);
+    ctx->buf = apply_volume_format(ctx, ctx->fmt, vol & 0x7f, pbval == 0, devicename);
     close(mixfd);
     goto out_with_format;
 #endif

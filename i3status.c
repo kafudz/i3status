@@ -22,6 +22,7 @@
 #include <netinet/in.h>
 #include <getopt.h>
 #include <signal.h>
+#include <errno.h>
 #include <confuse.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -58,7 +59,8 @@
 /* socket file descriptor for general purposes */
 int general_socket;
 
-static bool exit_upon_signal = false;
+/* Written from a signal handler, so it must be a sig_atomic_t. */
+static volatile sig_atomic_t exit_upon_signal = 0;
 static bool run_once = false;
 static bool config_test_only = false; /* NEW: --config-test / -t */
 
@@ -80,8 +82,9 @@ char *pct_mark;
  * https://www.securecoding.cert.org/confluence/display/seccode/SIG30-C.+Call+only+asynchronous-safe+functions+within+signal+handlers
  *
  */
-void fatalsig(int signum) {
-    exit_upon_signal = true;
+static void fatalsig(int signum) {
+    (void)signum;
+    exit_upon_signal = 1;
 }
 
 /*
@@ -89,7 +92,8 @@ void fatalsig(int signum) {
  * interrupt nanosleep() so that i3status immediately generates new output.
  *
  */
-void sigusr1(int signum) {
+static void sigusr1(int signum) {
+    (void)signum;
 }
 
 /*
@@ -213,6 +217,7 @@ static char *get_config_path(void) {
     if (path_exists(config_path))
         return config_path;
     free(config_path);
+<<<<<<< HEAD
 
     /* 3: check $XDG_CONFIG_DIRS. An empty value is treated as unset. */
     if ((xdg_config_dirs = getenv("XDG_CONFIG_DIRS")) == NULL || *xdg_config_dirs == '\0')
@@ -224,6 +229,10 @@ static char *get_config_path(void) {
 
     char *saveptr = NULL;
     char *tok = strtok_r(buf, ":", &saveptr);
+=======
+    char *buf = sstrdup(xdg_config_dirs);
+    char *tok = strtok(buf, ":");
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     while (tok != NULL) {
         char *resolved = resolve_tilde(tok);
         if (asprintf(&config_path, "%s/i3status/config", resolved) == -1)
@@ -505,6 +514,10 @@ int main(int argc, char *argv[]) {
     cfg_opt_t volume_opts[] = {
         CFG_STR("format", "♪: %volume", CFGF_NONE),
         CFG_STR("format_muted", "♪: 0%%", CFGF_NONE),
+        CFG_STR("icon_muted", "🔇", CFGF_NONE),
+        CFG_STR("icon_low", "🔈", CFGF_NONE),
+        CFG_STR("icon_medium", "🔉", CFGF_NONE),
+        CFG_STR("icon_high", "🔊", CFGF_NONE),
         CFG_STR("device", "default", CFGF_NONE),
         CFG_STR("mixer", "Master", CFGF_NONE),
         CFG_INT("mixer_idx", 0, CFGF_NONE),
@@ -595,6 +608,10 @@ int main(int argc, char *argv[]) {
                        argv[0]);
                 return 0;
                 break;
+            case '?':
+                /* getopt_long() has already printed what was wrong. */
+                fprintf(stderr, "Syntax: %s [-c <configfile>] [-h] [-v] [--run-once]\n", argv[0]);
+                return EXIT_FAILURE;
             case 'v':
                 printf("i3status " I3STATUS_VERSION " © 2008 Michael Stapelberg and contributors\n"
 #if HAS_PULSEAUDIO
@@ -623,7 +640,10 @@ int main(int argc, char *argv[]) {
         configfile = get_config_path();
 
     cfg = cfg_init(opts, CFGF_NOCASE);
-    if (cfg_parse(cfg, configfile) == CFG_PARSE_ERROR)
+    const int parse_result = cfg_parse(cfg, configfile);
+    if (parse_result == CFG_FILE_ERROR)
+        die("Could not open configuration file \"%s\": %s\n", configfile, strerror(errno));
+    if (parse_result == CFG_PARSE_ERROR)
         return EXIT_FAILURE;
 
     if (cfg_size(cfg, "order") == 0)
@@ -750,6 +770,40 @@ int main(int argc, char *argv[]) {
     if ((general_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
         die("Could not create socket\n");
 
+<<<<<<< HEAD
+=======
+    int interval = cfg_getint(cfg_general, "interval");
+    if (interval <= 0) {
+        die("Invalid interval attribute found in section %s, line %d: %d\n"
+            "Expected positive integer\n",
+            cfg_general->name, cfg_general->line, interval);
+    }
+
+    for (unsigned int k = 0; k < cfg_size(cfg, "order"); k++) {
+        const char *current = cfg_getnstr(cfg, "order", k);
+        const char *name = "battery";
+        if (!BEGINS_WITH(current, name)) {
+            continue;
+        }
+        const char *title = current[strlen(name)] == '\0' ? current + strlen(name) : current + strlen(name) + 1;
+        cfg_section = cfg_gettsec(cfg, name, title);
+        if (cfg_section == NULL) {
+            /* The order entry has no matching section (reported when it is
+             * processed below), so there is nothing to adjust. */
+            continue;
+        }
+        bool integer_battery_capacity = cfg_getbool(cfg_section, "integer_battery_capacity");
+        char *format_percentage = cfg_getstr(cfg_section, "format_percentage");
+        if (integer_battery_capacity) {
+            if (strcmp("%.02f%s", format_percentage) == 0) {
+                cfg_setstr(cfg_section, "format_percentage", "%.00f%s");
+            } else {
+                fprintf(stderr, "i3status: integer_battery_capacity is deprecated\n");
+            }
+        }
+    }
+
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     /* One memory page which each plugin can use to buffer output.
      * Even though it’s unclean, we just assume that the user will not
      * specify a format string which expands to something longer than 4096
@@ -760,7 +814,11 @@ int main(int argc, char *argv[]) {
 
     void **per_instance = calloc(cfg_size(cfg, "order"), sizeof(*per_instance));
     if (per_instance == NULL)
+<<<<<<< HEAD
         die("calloc() failed\n");
+=======
+        die("Error: out of memory (calloc())\n");
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     while (1) {
         if (exit_upon_signal) {
@@ -998,6 +1056,10 @@ int main(int argc, char *argv[]) {
                     .buflen = sizeof(buffer),
                     .fmt = cfg_getstr(sec, "format"),
                     .fmt_muted = cfg_getstr(sec, "format_muted"),
+                    .icon_muted = cfg_getstr(sec, "icon_muted"),
+                    .icon_low = cfg_getstr(sec, "icon_low"),
+                    .icon_medium = cfg_getstr(sec, "icon_medium"),
+                    .icon_high = cfg_getstr(sec, "icon_high"),
                     .device = cfg_getstr(sec, "device"),
                     .mixer = cfg_getstr(sec, "mixer"),
                     .mixer_idx = cfg_getint(sec, "mixer_idx"),
@@ -1065,8 +1127,14 @@ int main(int argc, char *argv[]) {
             unsigned int len;
 #endif
             yajl_gen_get_buf(json_gen, &buf, &len);
+<<<<<<< HEAD
             ssize_t w_ret = write(STDOUT_FILENO, buf, len);
             (void)w_ret;
+=======
+            /* Go through stdio (like everything else we print) so that a
+             * partial write is retried and the output stays in order. */
+            fwrite(buf, 1, len, stdout);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
             yajl_gen_clear(json_gen);
         }
 
@@ -1084,6 +1152,7 @@ int main(int argc, char *argv[]) {
          * that we start with :00 on every new minute. */
         struct timeval current_timeval;
         gettimeofday(&current_timeval, NULL);
+<<<<<<< HEAD
         struct timespec ts = {interval - 1 - (current_timeval.tv_sec % interval), (10e5 - current_timeval.tv_usec) * 1000};
 
         /* FIX: loop on EINTR. SIGUSR1 intentionally interrupts the sleep
@@ -1108,6 +1177,19 @@ int main(int argc, char *argv[]) {
 
         if (exit_upon_signal)
             continue;
+=======
+        struct timespec ts;
+        ts.tv_sec = interval - 1 - (current_timeval.tv_sec % interval);
+        ts.tv_nsec = (1000000L - (long)current_timeval.tv_usec) * 1000L;
+        /* Exactly on a full second the remainder is a whole second, which
+         * does not fit into tv_nsec. nanosleep() would reject it with EINVAL
+         * and we would immediately print a second, redundant line. */
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec += 1;
+            ts.tv_nsec -= 1000000000L;
+        }
+        nanosleep(&ts, NULL);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     }
 
     yajl_gen_free(json_gen);

@@ -88,7 +88,15 @@ struct disc_time *get_ddate(struct tm *current_tm) {
     if (current_tm == NULL)
         return NULL;
 
+<<<<<<< HEAD
     const int is_leap_year = is_gregorian_leap_year(current_tm->tm_year);
+=======
+    /* We have to know, whether we have to insert St. Tib's Day, so whether it's a leap
+     * year in gregorian calendar */
+    const int gregorian_year = current_tm->tm_year + 1900;
+    int is_leap_year = !(gregorian_year % 4) &&
+                       (!(gregorian_year % 400) || gregorian_year % 100);
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     /* tm_yday is 0-based; St. Tib's Day is the 60th day of a leap year
      * (0-based index 59). */
@@ -140,10 +148,12 @@ void print_ddate(ddate_ctx_t *ctx) {
     struct disc_time *dt;
 
     set_timezone(NULL); /* Use local time. */
-    localtime_r(&ctx->t, &current_tm);
+    if (localtime_r(&ctx->t, &current_tm) == NULL)
+        return;
     if ((dt = get_ddate(&current_tm)) == NULL)
         return;
 
+<<<<<<< HEAD
     /*
      * All string_* buffers are initialized to "" so that placeholders whose
      * value is not relevant today (notably %H on non-holidays and %N on
@@ -207,12 +217,67 @@ void print_ddate(ddate_ctx_t *ctx) {
         if (dt->season_day == 4 || dt->season_day == 49) {
             string_N[0] = '\n';
             string_N[1] = '\0';
+=======
+    char string_A[STRING_SIZE];
+    char string_a[STRING_SIZE];
+    char string_B[STRING_SIZE];
+    char string_b[STRING_SIZE];
+    char string_d[STRING_SIZE];
+    char string_e[STRING_SIZE];
+    char string_Y[STRING_SIZE];
+    /* Only filled in on holidays, so they must start out empty. */
+    char string_H[STRING_SIZE] = "";
+    char string_N[STRING_SIZE] = "";
+    /* Newline- and Tabbing-characters */
+    char string_n[2] = "\n";
+    char string_t[2] = "\t";
+    char string_tibs_day[14] = "St. Tib's Day";
+
+    /* Weekday in long and abbreviation */
+    snprintf(string_A, STRING_SIZE, "%s", day_long[dt->week_day]);
+    snprintf(string_a, STRING_SIZE, "%s", day_short[dt->week_day]);
+    /* Season in long and abbreviation */
+    snprintf(string_B, STRING_SIZE, "%s", season_long[dt->season]);
+    snprintf(string_b, STRING_SIZE, "%s", season_short[dt->season]);
+    /* Day of the season (ordinal and cardinal) */
+    snprintf(string_d, STRING_SIZE, "%d", dt->season_day + 1);
+    snprintf(string_e, STRING_SIZE, "%d", dt->season_day + 1);
+    /* The 11th, 12th and 13th (season_day is zero-based) are the exceptions
+     * to the st/nd/rd pattern. */
+    if (dt->season_day > 9 && dt->season_day < 13) {
+        strcat(string_e, "th");
+    } else {
+        switch (dt->season_day % 10) {
+            case 0:
+                strcat(string_e, "st");
+                break;
+            case 1:
+                strcat(string_e, "nd");
+                break;
+            case 2:
+                strcat(string_e, "rd");
+                break;
+            default:
+                strcat(string_e, "th");
+                break;
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         }
     }
 
     /* YOLD */
+<<<<<<< HEAD
     snprintf(string_Y, sizeof(string_Y), "%d", dt->year);
 
+=======
+    snprintf(string_Y, STRING_SIZE, "%d", dt->year);
+    /* Holidays */
+    if (dt->season_day == 4) {
+        snprintf(string_H, STRING_SIZE, "%s", holidays[dt->season]);
+    }
+    if (dt->season_day == 49) {
+        snprintf(string_H, STRING_SIZE, "%s", holidays[dt->season + 5]);
+    }
+>>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     placeholder_t placeholders[] = {
         {.name = "%A", .value = string_A},
         {.name = "%a", .value = string_a},

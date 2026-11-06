@@ -627,6 +627,13 @@ to "default", PulseAudio will be tried if detected and will fallback to ALSA
 
 *Example format_muted*: +♪ (%devicename): 0%%+
 
+The placeholder +%icon+ expands to a volume-dependent icon: +icon_muted+ when
+muted, otherwise +icon_low+ (below 34%), +icon_medium+ (below 67%) or
++icon_high+. The defaults are 🔇, 🔈, 🔉 and 🔊, so a nerd-font or plain-text
+set can be configured per module.
+
+*Example format with icon*: +%icon %volume+
+
 *Example configuration*:
 -------------------------------------------------------------
 volume master {
