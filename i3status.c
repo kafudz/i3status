@@ -29,7 +29,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <locale.h>
-#include <errno.h>
 
 #include <yajl/yajl_gen.h>
 #include <yajl/yajl_version.h>
@@ -62,7 +61,6 @@ int general_socket;
 /* Written from a signal handler, so it must be a sig_atomic_t. */
 static volatile sig_atomic_t exit_upon_signal = 0;
 static bool run_once = false;
-static bool config_test_only = false; /* NEW: --config-test / -t */
 
 cfg_t *cfg, *cfg_general, *cfg_section;
 
@@ -163,10 +161,7 @@ static int parse_min_width(cfg_t *context, cfg_opt_t *option, const char *value,
  *
  */
 static int valid_color(const char *value) {
-    if (value == NULL)
-        return 0;
-
-    const size_t len = strlen(value);
+    const int len = strlen(value);
 
     if (output_format == O_LEMONBAR) {
         /* lemonbar supports an optional alpha channel */
@@ -180,7 +175,7 @@ static int valid_color(const char *value) {
     }
     if (value[0] != '#')
         return 0;
-    for (size_t i = 1; i < len; ++i) {
+    for (int i = 1; i < len; ++i) {
         if (value[i] >= '0' && value[i] <= '9')
             continue;
         if (value[i] >= 'a' && value[i] <= 'f')
@@ -195,9 +190,8 @@ static int valid_color(const char *value) {
 static char *get_config_path(void) {
     char *xdg_config_home, *xdg_config_dirs, *config_path;
 
-    /* 1: check for $XDG_CONFIG_HOME/i3status/config. An empty
-     * XDG_CONFIG_HOME is treated like an unset variable. */
-    if ((xdg_config_home = getenv("XDG_CONFIG_HOME")) == NULL || *xdg_config_home == '\0')
+    /* 1: check for $XDG_CONFIG_HOME/i3status/config */
+    if ((xdg_config_home = getenv("XDG_CONFIG_HOME")) == NULL)
         xdg_config_home = "~/.config";
 
     xdg_config_home = resolve_tilde(xdg_config_home);
@@ -209,52 +203,38 @@ static char *get_config_path(void) {
         return config_path;
     free(config_path);
 
-    /* Keep the legacy home-directory path ahead of XDG_CONFIG_DIRS for
-     * compatibility with existing i3status installations. */
+    /* 2: check for $XDG_CONFIG_DIRS/i3status/config */
+    if ((xdg_config_dirs = getenv("XDG_CONFIG_DIRS")) == NULL)
+        xdg_config_dirs = "/etc/xdg";
 
-    /* Check the traditional path under the home directory. */
+    /* 3: check the traditional path under the home directory */
     config_path = resolve_tilde("~/.i3status.conf");
     if (path_exists(config_path))
         return config_path;
     free(config_path);
-<<<<<<< HEAD
-
-    /* 3: check $XDG_CONFIG_DIRS. An empty value is treated as unset. */
-    if ((xdg_config_dirs = getenv("XDG_CONFIG_DIRS")) == NULL || *xdg_config_dirs == '\0')
-        xdg_config_dirs = "/etc/xdg";
-
-    char *buf = strdup(xdg_config_dirs);
-    if (buf == NULL)
-        die("strdup() failed\n");
-
-    char *saveptr = NULL;
-    char *tok = strtok_r(buf, ":", &saveptr);
-=======
     char *buf = sstrdup(xdg_config_dirs);
     char *tok = strtok(buf, ":");
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     while (tok != NULL) {
-        char *resolved = resolve_tilde(tok);
-        if (asprintf(&config_path, "%s/i3status/config", resolved) == -1)
+        tok = resolve_tilde(tok);
+        if (asprintf(&config_path, "%s/i3status/config", tok) == -1)
             die("asprintf() failed\n");
-        free(resolved);
+        free(tok);
         if (path_exists(config_path)) {
             free(buf);
             return config_path;
         }
         free(config_path);
-        tok = strtok_r(NULL, ":", &saveptr);
+        tok = strtok(NULL, ":");
     }
     free(buf);
 
-    /* 4: finally, check the traditional path under /etc. */
+    /* 4: check the traditional path under /etc */
     config_path = SYSCONFDIR "/i3status.conf";
     if (path_exists(config_path))
         return sstrdup(config_path);
 
     die("Unable to find the configuration file (looked at "
-        "$XDG_CONFIG_HOME/i3status/config, ~/.i3status.conf, "
-        "$XDG_CONFIG_DIRS/i3status/config and " SYSCONFDIR "/i3status.conf)");
+        "~/.i3status.conf, $XDG_CONFIG_HOME/i3status/config, " SYSCONFDIR "/i3status.conf and $XDG_CONFIG_DIRS/i3status/config)");
 }
 
 /*
@@ -267,63 +247,6 @@ static char *get_default_separator() {
         // anything besides the empty string indicates that the default separator should be used
         return "default";
     return " | ";
-}
-
-/*
- * NEW: Validate that every entry in the "order" array refers to a section
- * that actually exists (either a singleton section or a titled section).
- * Returns the number of invalid entries and prints a diagnostic for each.
- */
-static int validate_order_sections(void) {
-    int errors = 0;
-    const int n = cfg_size(cfg, "order");
-    for (int j = 0; j < n; j++) {
-        const char *current = cfg_getnstr(cfg, "order", j);
-        if (current == NULL || current[0] == '\0') {
-            fprintf(stderr, "i3status: order entry %d is empty\n", j + 1);
-            errors++;
-            continue;
-        }
-
-        /* Try a singleton section first (e.g. "time", "load", "memory"). */
-        cfg_t *sec = cfg_getsec(cfg, current);
-        if (sec != NULL)
-            continue;
-
-        /* Otherwise it must be "<section> <title>". Split on the first space. */
-        const char *space = strchr(current, ' ');
-        if (space != NULL) {
-            size_t name_len = (size_t)(space - current);
-            if (name_len > 0 && space[1] != '\0') {
-                char *name = strndup(current, name_len);
-                if (name == NULL)
-                    die("strndup() failed while validating order\n");
-                cfg_t *tsec = cfg_gettsec(cfg, name, space + 1);
-                free(name);
-                if (tsec != NULL)
-                    continue;
-            }
-        }
-
-        fprintf(stderr, "i3status: order entry \"%s\" does not match any configured section\n", current);
-        errors++;
-    }
-    return errors;
-}
-
-/*
- * NEW: Look up the battery section for the given order entry, or NULL if it
- * isn't a battery entry / doesn't exist.
- */
-static cfg_t *battery_section_for_entry(const char *current) {
-    const char *name = "battery";
-    if (!BEGINS_WITH(current, name))
-        return NULL;
-    /* BEGINS_WITH("battery") is true also for "battery" exactly; require a space */
-    if (current[strlen(name)] != ' ')
-        return NULL;
-    const char *title = current + strlen(name) + 1;
-    return cfg_gettsec(cfg, name, title);
 }
 
 int main(int argc, char *argv[]) {
@@ -567,7 +490,6 @@ int main(int argc, char *argv[]) {
         {"config", required_argument, 0, 'c'},
         {"help", no_argument, 0, 'h'},
         {"version", no_argument, 0, 'v'},
-        {"config-test", no_argument, 0, 't'}, /* NEW */
         {"run-once", no_argument, 0, 0},
         {0, 0, 0, 0}};
 
@@ -591,20 +513,14 @@ int main(int argc, char *argv[]) {
     if (setlocale(LC_ALL, "") == NULL)
         die("Could not set locale. Please make sure all your LC_* / LANG settings are correct.\n");
 
-    while ((opt = getopt_long(argc, argv, "c:hvt", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "c:hv", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'c':
                 configfile = optarg;
                 break;
             case 'h':
                 printf("i3status " I3STATUS_VERSION " © 2008 Michael Stapelberg and contributors\n"
-                       "Syntax: %s [-c <configfile>] [-t] [-h] [-v] [--run-once]\n"
-                       "\n"
-                       "  -c, --config <file>  Use the given config file\n"
-                       "  -t, --config-test    Parse and validate the config, then exit\n"
-                       "  -h, --help           Show this help\n"
-                       "  -v, --version        Show version information\n"
-                       "      --run-once       Print one status line and exit\n",
+                       "Syntax: %s [-c <configfile>] [-h] [-v] [--run-once]\n",
                        argv[0]);
                 return 0;
                 break;
@@ -622,17 +538,11 @@ int main(int argc, char *argv[]) {
                 );
                 return 0;
                 break;
-            case 't':
-                config_test_only = true;
-                break;
             case 0:
                 if (strcmp(long_options[option_index].name, "run-once") == 0) {
                     run_once = true;
                 }
                 break;
-            default: /* FIX: report unknown options instead of silently ignoring them */
-                fprintf(stderr, "i3status: unknown option, try `%s --help`\n", argv[0]);
-                return EXIT_FAILURE;
         }
     }
 
@@ -700,52 +610,6 @@ int main(int argc, char *argv[]) {
     else
         die("Unknown markup format: \"%s\"\n", markup_str);
 
-    int interval = cfg_getint(cfg_general, "interval");
-    if (interval <= 0) {
-        die("Invalid interval attribute found in section %s, line %d: %d\n"
-            "Expected positive integer\n",
-            cfg_general->name, cfg_general->line, interval);
-    }
-
-    /* Validate the order array before either testing the configuration or
-     * entering the status-generation loop. Unknown entries otherwise produce
-     * a silently incomplete status line. */
-    int order_errors = validate_order_sections();
-    if (order_errors > 0) {
-        if (config_test_only) {
-            fprintf(stderr, "i3status: config test FAILED (%d invalid order entr%s)\n",
-                    order_errors, order_errors == 1 ? "y" : "ies");
-            return EXIT_FAILURE;
-        }
-        die("Found %d invalid entr%s in the 'order' array; fix the configuration.\n",
-            order_errors, order_errors == 1 ? "y" : "ies");
-    }
-
-    if (config_test_only) {
-        printf("i3status: config file \"%s\" parsed successfully.\n", configfile);
-        printf("i3status: output_format = %s, interval = %d\n", output_str, interval);
-        return EXIT_SUCCESS;
-    }
-
-    /* FIX: guard against NULL sections returned by cfg_gettsec; previously
-     * cfg_getbool(NULL, ...) would crash for a battery entry whose title
-     * did not correspond to a configured battery section. */
-    for (int j = 0; j < cfg_size(cfg, "order"); j++) {
-        const char *current = cfg_getnstr(cfg, "order", j);
-        cfg_section = battery_section_for_entry(current);
-        if (cfg_section == NULL)
-            continue;
-        bool integer_battery_capacity = cfg_getbool(cfg_section, "integer_battery_capacity");
-        char *format_percentage = cfg_getstr(cfg_section, "format_percentage");
-        if (integer_battery_capacity) {
-            if (strcmp("%.02f%s", format_percentage) == 0) {
-                cfg_setstr(cfg_section, "format_percentage", "%.00f%s");
-            } else {
-                fprintf(stderr, "i3status: integer_battery_capacity is deprecated\n");
-            }
-        }
-    }
-
 #if YAJL_MAJOR >= 2
     yajl_gen json_gen = yajl_gen_alloc(NULL);
 #else
@@ -770,8 +634,6 @@ int main(int argc, char *argv[]) {
     if ((general_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
         die("Could not create socket\n");
 
-<<<<<<< HEAD
-=======
     int interval = cfg_getint(cfg_general, "interval");
     if (interval <= 0) {
         die("Invalid interval attribute found in section %s, line %d: %d\n"
@@ -803,7 +665,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     /* One memory page which each plugin can use to buffer output.
      * Even though it’s unclean, we just assume that the user will not
      * specify a format string which expands to something longer than 4096
@@ -814,11 +675,7 @@ int main(int argc, char *argv[]) {
 
     void **per_instance = calloc(cfg_size(cfg, "order"), sizeof(*per_instance));
     if (per_instance == NULL)
-<<<<<<< HEAD
-        die("calloc() failed\n");
-=======
         die("Error: out of memory (calloc())\n");
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 
     while (1) {
         if (exit_upon_signal) {
@@ -1117,7 +974,6 @@ int main(int argc, char *argv[]) {
                 SEC_CLOSE_MAP;
             }
         }
-
         if (output_format == O_I3BAR) {
             yajl_gen_array_close(json_gen);
             const unsigned char *buf;
@@ -1127,14 +983,9 @@ int main(int argc, char *argv[]) {
             unsigned int len;
 #endif
             yajl_gen_get_buf(json_gen, &buf, &len);
-<<<<<<< HEAD
-            ssize_t w_ret = write(STDOUT_FILENO, buf, len);
-            (void)w_ret;
-=======
             /* Go through stdio (like everything else we print) so that a
              * partial write is retried and the output stays in order. */
             fwrite(buf, 1, len, stdout);
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
             yajl_gen_clear(json_gen);
         }
 
@@ -1152,32 +1003,6 @@ int main(int argc, char *argv[]) {
          * that we start with :00 on every new minute. */
         struct timeval current_timeval;
         gettimeofday(&current_timeval, NULL);
-<<<<<<< HEAD
-        struct timespec ts = {interval - 1 - (current_timeval.tv_sec % interval), (10e5 - current_timeval.tv_usec) * 1000};
-
-        /* FIX: loop on EINTR. SIGUSR1 intentionally interrupts the sleep
-         * so that we emit a fresh line immediately; but any other signal
-         * (e.g. SIGCHLD) should not shorten the interval. If the signal was
-         * SIGUSR1, `exit_upon_signal` stays false and we simply recompute
-         * and sleep again. If it was a fatal signal, break out and let the
-         * top of the loop handle it. */
-        while (nanosleep(&ts, &ts) == -1 && errno == EINTR && !exit_upon_signal) {
-            /* If the interrupting signal was SIGUSR1, we want to emit
-             * output immediately rather than continue sleeping. Detect
-             * this cheaply: a SIGUSR1 wakeup leaves the remaining time
-             * roughly equal to what we had. We can't reliably tell which
-             * signal woke us, so treat a EINTR as "refresh now" only if
-             * the remaining time is close to the original — otherwise keep
-             * sleeping. Simplest correct behaviour: on any non-fatal EINTR
-             * outside of SIGUSR1, re-sleep the remainder. Since we cannot
-             * distinguish, and the *documented* purpose of SIGUSR1 is to
-             * force a refresh, we simply refresh. */
-            break;
-        }
-
-        if (exit_upon_signal)
-            continue;
-=======
         struct timespec ts;
         ts.tv_sec = interval - 1 - (current_timeval.tv_sec % interval);
         ts.tv_nsec = (1000000L - (long)current_timeval.tv_usec) * 1000L;
@@ -1189,7 +1014,6 @@ int main(int argc, char *argv[]) {
             ts.tv_nsec -= 1000000000L;
         }
         nanosleep(&ts, NULL);
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     }
 
     yajl_gen_free(json_gen);

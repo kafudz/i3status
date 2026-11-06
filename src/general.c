@@ -6,13 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <glob.h>
-<<<<<<< HEAD
-#include <fcntl.h>    /* was <sys/fcntl.h> — nonstandard alias */
-=======
 #include <fcntl.h>
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
 #include <sys/stat.h>
 
 #include "i3status.h"
@@ -24,34 +19,16 @@
     }
 
 /*
- * Reads at most (size - 1) bytes from `filename` into `destination` and
- * NUL-terminates it.
+ * Reads (size - 1) bytes into the destination buffer from filename,
+ * and null-terminate it.
  *
- * On success, true is returned and `destination` holds a NUL-terminated
- * string of up to (size - 1) bytes (contents truncated if the file is
- * larger).  On failure, false is returned and the contents of `destination`
- * are left untouched.
+ * On success, true is returned. Otherwise, false is returned and the content
+ * of destination is left untouched.
  *
- * A short read caused by EINTR (e.g. a SIGUSR1 refresh) is retried; this
- * matters because i3status deliberately interrupts syscalls with SIGUSR1.
  */
 bool slurp(const char *filename, char *destination, int size) {
-    if (destination == NULL || size <= 0)
-        return false;
-
-<<<<<<< HEAD
     int fd;
-    if ((fd = open(filename, O_RDONLY)) == -1)
-        return false;
 
-    /* We need one byte for the trailing NUL byte. */
-    ssize_t n;
-    do {
-        n = read(fd, destination, (size_t)(size - 1));
-    } while (n == -1 && errno == EINTR);
-
-    if (n >= 0)
-=======
     /* We need at least one byte for the trailing 0 byte */
     if (size < 1)
         return false;
@@ -61,11 +38,10 @@ bool slurp(const char *filename, char *destination, int size) {
 
     ssize_t n = read(fd, destination, size - 1);
     if (n != -1)
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
         destination[n] = '\0';
     (void)close(fd);
 
-    return n >= 0;
+    return n != -1;
 }
 
 /*
@@ -73,26 +49,8 @@ bool slurp(const char *filename, char *destination, int size) {
  * It may resolve wildcards in the first part of the path, but if no match
  * or multiple matches are found, it just returns a copy of path as given.
  *
- * The caller owns the returned string and must free() it.
  */
 char *resolve_tilde(const char *path) {
-<<<<<<< HEAD
-    /*
-     * Use a *local* glob_t, not a static one: a static would be shared
-     * across calls and make globfree() on a partially-initialized struct
-     * a real hazard.  We also only call globfree() when glob() succeeded
-     * (POSIX leaves the struct unspecified on failure, so freeing it is
-     * undefined behaviour even though glibc happens to tolerate it).
-     */
-    glob_t globbuf;
-    memset(&globbuf, 0, sizeof(globbuf));
-
-    char *result = NULL;
-    const char *tail = strchr(path, '/');
-    size_t head_len = tail ? (size_t)(tail - path) : strlen(path);
-
-    char *head = strndup(path, head_len);
-=======
     glob_t globbuf;
     char *head, *result = NULL;
     const char *tail;
@@ -101,44 +59,32 @@ char *resolve_tilde(const char *path) {
 
     tail = strchr(path, '/');
     head = strndup(path, tail ? (size_t)(tail - path) : strlen(path));
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     if (head == NULL)
         die("Error: out of memory (strndup())\n");
 
     int res = glob(head, GLOB_TILDE, NULL, &globbuf);
     free(head);
 
-<<<<<<< HEAD
-    if (res == GLOB_NOMATCH || globbuf.gl_pathc != 1) {
-        /* No match, or many wildcard matches: use the path unchanged. */
-        result = sstrdup(path);
-    } else if (res != 0) {
-        /* GLOB_ABORTED, GLOB_NOSPACE, or an unknown error. */
-        globfree(&globbuf);
-        die("glob() failed");
-=======
     /* no match, an error, or many wildcard matches: keep the path as given */
     if (res != 0 || globbuf.gl_pathc != 1) {
         result = sstrdup(path);
->>>>>>> 8e7bd0df670daf3f480461efd8f0546a5cef3f5c
     } else {
-        const char *expanded = globbuf.gl_pathv[0];
-        size_t total = strlen(expanded) + (tail ? strlen(tail) : 0);
-        result = scalloc(total + 1);
-        /* Copy while globbuf is still alive: globfree() below invalidates
-         * gl_pathv[0]. */
-        strcpy(result, expanded);
-        if (tail)
+        head = globbuf.gl_pathv[0];
+        result = scalloc(strlen(head) + (tail ? strlen(tail) : 0) + 1);
+        strcpy(result, head);
+        if (tail) {
             strcat(result, tail);
+        }
     }
-
     globfree(&globbuf);
+
     return result;
 }
 
 char *sstrdup(const char *str) {
-    if (str == NULL)
+    if (str == NULL) {
         return NULL;
+    }
     char *result = strdup(str);
     exit_if_null(result, "Error: out of memory (strdup())\n");
     return result;
@@ -151,23 +97,11 @@ void *scalloc(size_t size) {
 }
 
 /*
- * Returns a pointer to the `amount`-th occurrence of `character` in
- * `input`, or `input` itself if `amount` is 0 or `input` is empty.
+ * Skip the given character for exactly 'amount' times, returns
+ * a pointer to the first non-'character' character in 'input'.
  *
- * NOTE: despite the name, the returned pointer points *at* the matched
- * character (e.g. the space), not past it.  Callers rely on this so that
- * atoi()/strtod() can skip the leading whitespace themselves.  If there
- * are fewer than `amount` occurrences, the pointer to the last character
- * of the string is returned.
- *
- * The comment previously claimed "first non-'character' character", which
- * does not match the implementation.  Renaming would touch all callers, so
- * the comment is corrected instead.
  */
 char *skip_character(char *input, char character, int amount) {
-    if (input == NULL || amount < 0)
-        return input;
-
     char *walk;
     size_t len = strlen(input);
     int blanks = 0;
@@ -180,10 +114,10 @@ char *skip_character(char *input, char character, int amount) {
 }
 
 /*
- * Write an error message to stderr and exit.  Marked noreturn so the
- * compiler knows control does not continue past this call.
+ * Write errormessage to statusbar and exit
+ *
  */
-_Noreturn void die(const char *fmt, ...) {
+void die(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     (void)vfprintf(stderr, fmt, ap);
