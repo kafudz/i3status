@@ -1,0 +1,83 @@
+# Maintainer: kafudz <kafudz@users.noreply.github.com>
+#
+# This package builds the local working tree, so uncommitted changes (such as
+# the brightness module) are included. Keep this file in packaging/arch/ and
+# run makepkg from that directory:
+#
+#     cd packaging/arch
+#     makepkg -si
+#
+pkgname=i3status-kafudz-git
+_pkgname=i3status
+pkgver=2.15.r949.gb37d987
+pkgrel=1
+pkgdesc='Status bar generator for i3bar, dzen2, xmobar and similar (kafudz fork, built from git)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/kafudz/i3status'
+license=('BSD-3-Clause')
+depends=('glibc' 'confuse' 'yajl' 'alsa-lib' 'libpulse' 'libnl')
+makedepends=('git' 'meson' 'perl' 'asciidoc' 'xmlto')
+provides=("i3status=${pkgver%%.r*}")
+conflicts=('i3status')
+backup=('etc/i3status.conf')
+options=('!debug')
+source=()
+sha256sums=()
+
+prepare() {
+  local repo_root
+  repo_root=$(realpath "$startdir/../..")
+
+  if [[ ! -f "$repo_root/meson.build" ]]; then
+    error "PKGBUILD must be kept in packaging/arch/ inside the i3status tree"
+  fi
+
+  rm -rf "$srcdir/$_pkgname"
+  mkdir -p "$srcdir/$_pkgname"
+
+  # Copy the local working tree (including .git for pkgver) so that
+  # uncommitted changes are packaged. Build output and makepkg's own
+  # directories are excluded.
+  tar -C "$repo_root" \
+    --exclude='./build' \
+    --exclude='./build-*' \
+    --exclude='./packaging/arch/src' \
+    --exclude='./packaging/arch/pkg' \
+    --exclude='./packaging/arch/*.pkg.tar.*' \
+    -cf - . | tar -C "$srcdir/$_pkgname" -xf -
+}
+
+pkgver() {
+  cd "$srcdir/$_pkgname"
+
+  local base version
+  base=$(grep -Eom1 '[0-9]+(\.[0-9]+)+' I3STATUS_VERSION)
+  version=$(printf '%s.r%s.g%s' \
+    "$base" \
+    "$(git rev-list --count HEAD)" \
+    "$(git rev-parse --short HEAD)")
+
+  if ! git diff --quiet --ignore-submodules HEAD -- ||
+    [[ -n $(git ls-files --others --exclude-standard | grep -v '^packaging/arch/') ]]; then
+    version+='.dirty'
+  fi
+
+  printf '%s' "$version"
+}
+
+build() {
+  cd "$srcdir/$_pkgname"
+  arch-meson . build --sysconfdir=/etc -Dmans=true
+  meson compile -C build
+}
+
+check() {
+  cd "$srcdir/$_pkgname"
+  meson test -C build --print-errorlogs
+}
+
+package() {
+  cd "$srcdir/$_pkgname"
+  meson install -C build --destdir "$pkgdir"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

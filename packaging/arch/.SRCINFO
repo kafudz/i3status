@@ -1,0 +1,25 @@
+pkgbase = i3status-kafudz-git
+	pkgdesc = Status bar generator for i3bar, dzen2, xmobar and similar (kafudz fork, built from git)
+	pkgver = 2.15.r949.gb37d987
+	pkgrel = 1
+	url = https://github.com/kafudz/i3status
+	arch = x86_64
+	arch = aarch64
+	license = BSD-3-Clause
+	makedepends = git
+	makedepends = meson
+	makedepends = perl
+	makedepends = asciidoc
+	makedepends = xmlto
+	depends = glibc
+	depends = confuse
+	depends = yajl
+	depends = alsa-lib
+	depends = libpulse
+	depends = libnl
+	provides = i3status=2.15
+	conflicts = i3status
+	options = !debug
+	backup = etc/i3status.conf
+
+pkgname = i3status-kafudz-git

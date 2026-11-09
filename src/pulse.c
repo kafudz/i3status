@@ -288,9 +288,9 @@ bool description_pulseaudio(uint32_t sink_idx, const char *sink_name, char buffe
                 continue;
             }
         }
-        strncpy(buffer, entry->description, sizeof(entry->description) - 1);
+        snprintf(buffer, MAX_SINK_DESCRIPTION_LEN, "%.*s",
+                 (int)sizeof(entry->description) - 1, entry->description);
         pthread_mutex_unlock(&pulse_mutex);
-        buffer[sizeof(entry->description) - 1] = '\0';
         return true;
     }
     pthread_mutex_unlock(&pulse_mutex);

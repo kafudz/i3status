@@ -31,7 +31,7 @@
 #include "i3status.h"
 #include "queue.h"
 
-#define STRING_SIZE 10
+#define STRING_SIZE 32
 
 #define ALSA_VOLUME(channel)                                                    \
     err = snd_mixer_selem_get_##channel##_dB_range(elem, &min, &max) ||         \
