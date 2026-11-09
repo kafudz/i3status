@@ -151,7 +151,9 @@ char *auto_detect_format(void) {
             fprintf(stderr, "i3status: cannot auto-configure, situation ambiguous (format \"%s\" *and* \"%s\" detected)\n", newfmt, format);
             format = NULL;
             break;
-        } else {
+        } else if (newfmt != NULL) {
+            /* Do not let an unrelated process (which is not one of the known
+             * bar programs) erase a format we already detected. */
             format = newfmt;
         }
     }

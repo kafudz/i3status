@@ -66,7 +66,7 @@ void print_time(time_ctx_t *ctx) {
     char string_time[STRING_SIZE];
 
     if (ctx->format_time == NULL) {
-        outwalk += strftime(ctx->buf, ctx->buflen, ctx->format, &tm);
+        outwalk += strftime(ctx->buf, ctx->buflen, ctx->format != NULL ? ctx->format : "", &tm);
     } else {
         strftime(string_time, sizeof(string_time), ctx->format_time, &tm);
         placeholder_t placeholders[] = {

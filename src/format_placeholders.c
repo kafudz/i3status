@@ -23,8 +23,10 @@
  *
  */
 char *format_placeholders(const char *format, placeholder_t *placeholders, int num) {
+    /* A missing format (e.g. an unset optional config option) must never make
+     * the caller dereference a NULL pointer. Expand it to an empty string. */
     if (format == NULL)
-        return NULL;
+        return scalloc(1);
 
     /* We have to first iterate over the string to see how much buffer space
      * we need to allocate. A placeholder without a value expands to nothing. */

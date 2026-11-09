@@ -55,6 +55,9 @@ char *resolve_tilde(const char *path) {
     char *head, *result = NULL;
     const char *tail;
 
+    if (path == NULL)
+        return NULL;
+
     memset(&globbuf, 0, sizeof(globbuf));
 
     tail = strchr(path, '/');
@@ -103,6 +106,8 @@ void *scalloc(size_t size) {
  */
 char *skip_character(char *input, char character, int amount) {
     char *walk;
+    if (input == NULL)
+        return NULL;
     size_t len = strlen(input);
     int blanks = 0;
 

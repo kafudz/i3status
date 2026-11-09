@@ -134,7 +134,7 @@ static bool below_threshold(struct statvfs buf, const char *prefix_type, const c
  *
  */
 void print_disk_info(disk_info_ctx_t *ctx) {
-    const char *selected_format = ctx->format;
+    const char *selected_format = (ctx->format != NULL) ? ctx->format : "";
     char *outwalk = ctx->buf;
     bool colorful_output = false;
     bool mounted = false;
@@ -143,25 +143,23 @@ void print_disk_info(disk_info_ctx_t *ctx) {
 
 #if defined(__DragonFly__) || defined(__APPLE__)
     struct statfs buf;
+    memset(&buf, 0, sizeof(buf));
 
-    if (statfs(ctx->path, &buf) == -1)
-        return;
-
-    mounted = true;
+    if (ctx->path != NULL && statfs(ctx->path, &buf) == 0)
+        mounted = true;
 #elif defined(__NetBSD__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__OpenBSD__)
     struct statvfs buf;
+    memset(&buf, 0, sizeof(buf));
 
-    if (statvfs(ctx->path, &buf) == -1)
-        return;
-
-    mounted = true;
+    if (ctx->path != NULL && statvfs(ctx->path, &buf) == 0)
+        mounted = true;
 #else
     /* Start from zero: if statvfs() fails below, the (unused) values must at
      * least be well-defined rather than uninitialised stack contents. */
     struct statvfs buf;
     memset(&buf, 0, sizeof(buf));
 
-    if (statvfs(ctx->path, &buf) == -1) {
+    if (ctx->path == NULL || statvfs(ctx->path, &buf) == -1) {
         /* If statvfs errors, e.g., due to the path not existing,
          * we consider the device not mounted. */
         mounted = false;

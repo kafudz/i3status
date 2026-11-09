@@ -189,7 +189,7 @@ void print_ipv6_info(ipv6_info_ctx_t *ctx) {
     /* Lookup the interface name only if there is IPv6 connectivity *and* the
      * user actually wants to display the interface name */
     const char *iface_string =
-        (addr_string && strstr(ctx->format_up, iface_placeholder))
+        (addr_string && ctx->format_up != NULL && strstr(ctx->format_up, iface_placeholder))
             ? get_iface_addr(addr_string)
             : "";
     char *outwalk = ctx->buf;

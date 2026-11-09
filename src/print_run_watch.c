@@ -10,7 +10,9 @@
 #define STRING_SIZE 5
 
 void print_run_watch(run_watch_ctx_t *ctx) {
-    bool running = process_runs(ctx->pidfile);
+    /* pidfile is a required option; treat a missing one as "not running"
+     * instead of handing NULL to glob(3). */
+    bool running = (ctx->pidfile != NULL && process_runs(ctx->pidfile));
     const char *walk;
     char *outwalk = ctx->buf;
 

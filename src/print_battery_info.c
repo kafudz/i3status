@@ -536,6 +536,11 @@ static bool slurp_all_batteries(battery_info_ctx_t *ctx, struct battery_info *ba
     char *outwalk = buffer;
     bool is_found = false;
 
+    if (path == NULL) {
+        OUTPUT_FULL_TEXT(format_down);
+        return false;
+    }
+
     const char *placeholder;
     char *globpath = sstrdup(path);
     if ((placeholder = strstr(path, "%d")) != NULL) {
@@ -603,6 +608,13 @@ void print_battery_info(battery_info_ctx_t *ctx) {
     };
     bool colorful_output = false;
 
+    /* path has a default, but must never be handed to printf-style code when
+     * a configuration leaves it unset. */
+    if (ctx->path == NULL) {
+        OUTPUT_FULL_TEXT(ctx->format_down);
+        return;
+    }
+
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__) || defined(__OpenBSD__)
     /* These OSes report battery stats in whole percent. */
     if (strcmp("%.02f%s", ctx->format_percentage) == 0) {
@@ -642,7 +654,13 @@ void print_battery_info(battery_info_ctx_t *ctx) {
     }
 
     if (batt_info.percentage_remaining < 0) {
-        batt_info.percentage_remaining = (((float)batt_info.remaining / (float)full) * 100);
+        if (full <= 0) {
+            /* No usable capacity to compute a percentage from, but there may
+             * still be a status to report. Do not divide by zero. */
+            batt_info.percentage_remaining = 0;
+        } else {
+            batt_info.percentage_remaining = (((float)batt_info.remaining / (float)full) * 100);
+        }
         /* Some batteries report POWER_SUPPLY_CHARGE_NOW=<full_design> when fully
          * charged, even though that’s plainly wrong. For people who chose to see
          * the percentage calculated based on the last full capacity, we clamp the

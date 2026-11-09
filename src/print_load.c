@@ -33,7 +33,7 @@ void print_load(load_ctx_t *ctx) {
 
 #if defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__linux__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__APPLE__) || defined(sun) || defined(__DragonFly__)
     double loadavg[3] = {0.0, 0.0, 0.0};
-    const char *selected_format = ctx->format;
+    const char *selected_format = (ctx->format != NULL) ? ctx->format : "";
     bool colorful_output = false;
 
     /* getloadavg() returns the number of samples it retrieved (possibly fewer

@@ -115,6 +115,11 @@ void maybe_escape_markup(const char *text, char *buffer, size_t size) {
         return;
     }
 
+    if (text == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
+
     if (markup_format == M_NONE) {
         snprintf(buffer, size, "%s", text);
         return;

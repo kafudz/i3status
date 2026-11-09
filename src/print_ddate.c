@@ -78,8 +78,11 @@ struct disc_time *get_ddate(struct tm *current_tm) {
     int yday = current_tm->tm_yday;
 
     if (is_leap_year && yday == 59) {
-        /* On St. Tibs Day we don't have to define a date */
+        /* On St. Tibs Day we don't have to define a date, but keep the other
+         * fields deterministic instead of reusing last call's values. */
         dt.st_tibs_day = 1;
+        dt.season_day = 0;
+        dt.week_day = 0;
     } else {
         dt.st_tibs_day = 0;
         if (is_leap_year && yday > 59)
@@ -98,10 +101,14 @@ void print_ddate(ddate_ctx_t *ctx) {
     struct tm current_tm;
     struct disc_time *dt;
     set_timezone(NULL); /* Use local time. */
-    if (localtime_r(&ctx->t, &current_tm) == NULL)
+    if (localtime_r(&ctx->t, &current_tm) == NULL) {
+        OUTPUT_FULL_TEXT("");
         return;
-    if ((dt = get_ddate(&current_tm)) == NULL)
+    }
+    if ((dt = get_ddate(&current_tm)) == NULL) {
+        OUTPUT_FULL_TEXT("");
         return;
+    }
 
     char string_A[STRING_SIZE];
     char string_a[STRING_SIZE];
@@ -172,7 +179,7 @@ void print_ddate(ddate_ctx_t *ctx) {
         {.name = "%}", .value = ""}};
 
     const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
-    char *formatted = format_placeholders(ctx->format, &placeholders[0], num);
+    char *formatted = format_placeholders(ctx->format != NULL ? ctx->format : "", &placeholders[0], num);
     OUTPUT_FORMATTED;
     free(formatted);
     OUTPUT_FULL_TEXT(ctx->buf);

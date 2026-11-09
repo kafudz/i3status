@@ -5,6 +5,7 @@
 #endif
 #include <stdlib.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <yajl/yajl_gen.h>
@@ -64,13 +65,42 @@ static struct cpu_usage prev_all = {0, 0, 0, 0, 0};
 static struct cpu_usage *prev_cpus = NULL;
 static struct cpu_usage *curr_cpus = NULL;
 
+/* Append a single character without ever leaving the output buffer. */
+static char *append_char(char *outwalk, char *buf, size_t buflen, char c) {
+    if ((size_t)(outwalk - buf) + 1 >= buflen)
+        return outwalk;
+    *outwalk++ = c;
+    *outwalk = '\0';
+    return outwalk;
+}
+
+/* snprintf() into the remaining output buffer, clamping the returned length
+ * when the formatted text was truncated. */
+static char *append_format(char *outwalk, char *buf, size_t buflen, const char *format, ...) {
+    if (outwalk >= buf + buflen)
+        return outwalk;
+
+    const size_t avail = (size_t)(buf + buflen - outwalk);
+    va_list ap;
+    va_start(ap, format);
+    const int n = vsnprintf(outwalk, avail, format, ap);
+    va_end(ap);
+    if (n < 0)
+        return outwalk;
+
+    size_t written = (size_t)n;
+    if (written >= avail)
+        written = avail - 1;
+    return outwalk + written;
+}
+
 /*
  * Reads the CPU utilization from /proc/stat and returns the usage as a
  * percentage.
  *
  */
 void print_cpu_usage(cpu_usage_ctx_t *ctx) {
-    const char *selected_format = ctx->format;
+    const char *selected_format = (ctx->format != NULL) ? ctx->format : "";
     const char *walk;
     char *outwalk = ctx->buf;
     struct cpu_usage curr_all = {0, 0, 0, 0, 0};
@@ -86,6 +116,8 @@ void print_cpu_usage(cpu_usage_ctx_t *ctx) {
 
     // Detecting if CPU count has changed
     int curr_cpu_count = get_nprocs_conf();
+    if (curr_cpu_count <= 0)
+        goto error;
     if (curr_cpu_count != cpu_count) {
         cpu_count = curr_cpu_count;
         free(prev_cpus);
@@ -97,6 +129,8 @@ void print_cpu_usage(cpu_usage_ctx_t *ctx) {
     }
 
     memcpy(curr_cpus, prev_cpus, cpu_count * sizeof(struct cpu_usage));
+    if (ctx->path == NULL)
+        goto error;
     FILE *f = fopen(ctx->path, "r");
     if (f == NULL) {
         fprintf(stderr, "i3status: open %s: %s\n", ctx->path, strerror(errno));
@@ -201,10 +235,10 @@ void print_cpu_usage(cpu_usage_ctx_t *ctx) {
 
     for (walk = selected_format; *walk != '\0'; walk++) {
         if (*walk != '%') {
-            *(outwalk++) = *walk;
+            outwalk = append_char(outwalk, ctx->buf, ctx->buflen, *walk);
 
         } else if (BEGINS_WITH(walk + 1, "usage")) {
-            outwalk += sprintf(outwalk, "%02d%s", diff_usage, pct_mark);
+            outwalk = append_format(outwalk, ctx->buf, ctx->buflen, "%02d%s", diff_usage, pct_mark);
             walk += strlen("usage");
         }
 #if defined(__linux__)
@@ -222,13 +256,13 @@ void print_cpu_usage(cpu_usage_ctx_t *ctx) {
                 long long cpu_diff_idle = curr_cpus[number].idle - prev_cpus[number].idle;
                 long long cpu_diff_total = curr_cpus[number].total - prev_cpus[number].total;
                 int cpu_diff_usage = (cpu_diff_total ? (1000 * (cpu_diff_total - cpu_diff_idle) / cpu_diff_total + 5) / 10 : 0);
-                outwalk += sprintf(outwalk, "%02d%s", cpu_diff_usage, pct_mark);
+                outwalk = append_format(outwalk, ctx->buf, ctx->buflen, "%02d%s", cpu_diff_usage, pct_mark);
             }
             walk += length;
         }
 #endif
         else {
-            *(outwalk++) = '%';
+            outwalk = append_char(outwalk, ctx->buf, ctx->buflen, '%');
         }
     }
 

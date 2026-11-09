@@ -44,6 +44,10 @@ static int print_bytes_human(char *outwalk, size_t size, unsigned long bytes, co
 static int print_percentage(char *outwalk, float percent) {
     return snprintf(outwalk, STRING_SIZE, "%.1f%s", percent, pct_mark);
 }
+
+static double percentage_of(unsigned long part, unsigned long total) {
+    return total == 0 ? 0.0 : 100.0 * (double)part / (double)total;
+}
 #endif
 
 #if defined(__linux__)
@@ -94,7 +98,7 @@ void print_memory(memory_ctx_t *ctx) {
     char *outwalk = ctx->buf;
 
 #if defined(__linux__)
-    const char *selected_format = ctx->format;
+    const char *selected_format = (ctx->format != NULL) ? ctx->format : "";
     const char *output_color = NULL;
 
     int unread_fields = 6;
@@ -143,6 +147,8 @@ void print_memory(memory_ctx_t *ctx) {
     ram_cached *= 1024UL;
     ram_shared *= 1024UL;
 
+    if (ctx->memory_used_method == NULL)
+        die("memory_used_method must not be empty");
     unsigned long ram_used;
     if (BEGINS_WITH(ctx->memory_used_method, "memavailable")) {
         ram_used = ram_total > ram_available ? ram_total - ram_available : 0;
@@ -189,10 +195,10 @@ void print_memory(memory_ctx_t *ctx) {
     print_bytes_human(string_ram_free, sizeof(string_ram_free), ram_free, ctx->unit, ctx->decimals);
     print_bytes_human(string_ram_available, sizeof(string_ram_available), ram_available, ctx->unit, ctx->decimals);
     print_bytes_human(string_ram_shared, sizeof(string_ram_shared), ram_shared, ctx->unit, ctx->decimals);
-    print_percentage(string_percentage_free, 100.0 * ram_free / ram_total);
-    print_percentage(string_percentage_available, 100.0 * ram_available / ram_total);
-    print_percentage(string_percentage_used, 100.0 * ram_used / ram_total);
-    print_percentage(string_percentage_shared, 100.0 * ram_shared / ram_total);
+    print_percentage(string_percentage_free, percentage_of(ram_free, ram_total));
+    print_percentage(string_percentage_available, percentage_of(ram_available, ram_total));
+    print_percentage(string_percentage_used, percentage_of(ram_used, ram_total));
+    print_percentage(string_percentage_shared, percentage_of(ram_shared, ram_total));
 
     placeholder_t placeholders[] = {
         {.name = "%total", .value = string_ram_total},

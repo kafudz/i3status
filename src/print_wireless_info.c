@@ -171,6 +171,7 @@ static int gwi_sta_cb(struct nl_msg *msg, void *data) {
     struct nlattr *rinfo[NL80211_RATE_INFO_MAX + 1];
     static struct nla_policy stats_policy[NL80211_STA_INFO_MAX + 1] = {
         [NL80211_STA_INFO_RX_BITRATE] = {.type = NLA_NESTED},
+        [NL80211_STA_INFO_SIGNAL] = {.type = NLA_U8},
     };
 
     static struct nla_policy rate_policy[NL80211_RATE_INFO_MAX + 1] = {
@@ -244,7 +245,8 @@ static int gwi_scan_cb(struct nl_msg *msg, void *data) {
         status != NL80211_BSS_STATUS_IBSS_JOINED)
         return NL_SKIP;
 
-    if (bss[NL80211_BSS_BSSID] == NULL)
+    if (bss[NL80211_BSS_BSSID] == NULL ||
+        nla_len(bss[NL80211_BSS_BSSID]) < ETH_ALEN)
         return NL_SKIP;
 
     memcpy(info->bssid, nla_data(bss[NL80211_BSS_BSSID]), ETH_ALEN);

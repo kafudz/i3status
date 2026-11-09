@@ -1,6 +1,7 @@
 // vim:ts=4:sw=4:expandtab
 #include <config.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <glob.h>
 #include <string.h>
 #include <sys/types.h>
@@ -24,10 +25,24 @@
  *
  */
 static bool pid_buffer_runs(const char *pidbuf) {
-    const long pid = strtol(pidbuf, NULL, 10);
-    if (pid <= 0)
+    char *end = NULL;
+    errno = 0;
+    const long parsed = strtol(pidbuf, &end, 10);
+    /* PID files usually end in a newline; allow surrounding whitespace but
+     * reject empty files, trailing garbage and out-of-range values instead of
+     * potentially signalling a completely different process. */
+    while (isspace((unsigned char)*end))
+        end++;
+    if (end == pidbuf || *end != '\0' || errno == ERANGE || parsed <= 0)
         return false;
-    return (kill((pid_t)pid, 0) == 0 || errno == EPERM);
+
+    const pid_t pid = (pid_t)parsed;
+    /* The value must survive the conversion to pid_t unchanged. */
+    if (pid <= 0 || (long)pid != parsed)
+        return false;
+
+    errno = 0;
+    return (kill(pid, 0) == 0 || errno == EPERM);
 }
 
 /*
@@ -43,6 +58,9 @@ bool process_runs(const char *path) {
     glob_t globbuf;
     memset(pidbuf, 0, sizeof(pidbuf));
     memset(&globbuf, 0, sizeof(globbuf));
+
+    if (path == NULL)
+        return false;
 
     if (glob(path, GLOB_NOCHECK | GLOB_TILDE, NULL, &globbuf) != 0)
         die("glob() failed\n");

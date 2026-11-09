@@ -146,15 +146,27 @@ static int print_eth_speed(char *outwalk, const char *interface) {
  * | 127.0.0.1    | ::1/128      | IPv4      | ok                |
  */
 void print_eth_info(eth_info_ctx_t *ctx) {
-    const char *format = ctx->format_down;  // default format
+    const char *format = ctx->format_down; /* default format */
+    const char *interface = (ctx->interface != NULL) ? ctx->interface : "";
 
     char *outwalk = ctx->buf;
-    size_t num = 0;
+    char string_ip[STRING_SIZE] = "";
+    char string_speed[STRING_SIZE] = "";
+    char string_interface[STRING_SIZE] = "";
 
-    INSTANCE(ctx->interface);
+    /* Declare the (empty) placeholders before the early error path: jumping
+     * over their declaration used to leave `num` at zero and the values
+     * uninitialised. */
+    placeholder_t placeholders[] = {
+        {.name = "%ip", .value = string_ip},
+        {.name = "%speed", .value = string_speed},
+        {.name = "%interface", .value = string_interface}};
+    const size_t num = sizeof(placeholders) / sizeof(placeholder_t);
 
-    char *ipv4_address = sstrdup(get_ip_addr(ctx->interface, AF_INET));
-    char *ipv6_address = sstrdup(get_ip_addr(ctx->interface, AF_INET6));
+    INSTANCE(interface);
+
+    char *ipv4_address = sstrdup(get_ip_addr(interface, AF_INET));
+    char *ipv6_address = sstrdup(get_ip_addr(interface, AF_INET6));
 
     /*
      * Removing '%' and following characters from IPv6 since the interface identifier is redundant,
@@ -188,21 +200,11 @@ void print_eth_info(eth_info_ctx_t *ctx) {
         START_COLOR("color_good");
     }
 
-    char string_ip[STRING_SIZE];
-    char string_speed[STRING_SIZE];
-    char string_interface[STRING_SIZE];
     snprintf(string_ip, STRING_SIZE, "%s", ip_address);
-    print_eth_speed(string_speed, ctx->interface);
-    snprintf(string_interface, STRING_SIZE, "%s", ctx->interface);
-    
-    placeholder_t placeholders[] = {
-        {.name = "%ip", .value = string_ip},
-        {.name = "%speed", .value = string_speed},
-        {.name = "%interface", .value = string_interface}
-    };
-    num = sizeof(placeholders) / sizeof(placeholder_t);
+    print_eth_speed(string_speed, interface);
+    snprintf(string_interface, STRING_SIZE, "%s", interface);
 
-out:
+out: {
     char *formatted = format_placeholders(format, &placeholders[0], num);
     OUTPUT_FORMATTED;
     free(formatted);
@@ -211,4 +213,5 @@ out:
     free(ipv4_address);
     free(ipv6_address);
     OUTPUT_FULL_TEXT(ctx->buf);
+}
 }

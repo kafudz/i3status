@@ -63,12 +63,12 @@ static int read_temperature(char *thermal_zone, temperature_t *temperature) {
         return ERROR_CODE;
 
     temp = strtol(buf, NULL, 10);
-    temperature->raw_value = temp / 1000;
+    temperature->raw_value = temp / 1000.0;
 
     if (temp == LONG_MIN || temp == LONG_MAX || temp <= 0)
         strcpy(temperature->formatted_value, "?");
     else
-        sprintf(temperature->formatted_value, "%ld", (temp / 1000));
+        snprintf(temperature->formatted_value, sizeof(temperature->formatted_value), "%ld", (temp / 1000));
 
 #elif defined(__DragonFly__)
     struct sensor th_sensor;
@@ -82,7 +82,7 @@ static int read_temperature(char *thermal_zone, temperature_t *temperature) {
     }
 
     temperature->raw_value = MUKTOC(th_sensor.value);
-    sprintf(temperature->formatted_value, "%.2f", MUKTOC(th_sensor.value));
+    snprintf(temperature->formatted_value, sizeof(temperature->formatted_value), "%.2f", MUKTOC(th_sensor.value));
 
 #elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
     int sysctl_rslt;
@@ -92,7 +92,7 @@ static int read_temperature(char *thermal_zone, temperature_t *temperature) {
         return ERROR_CODE;
 
     temperature->raw_value = TZ_AVG(sysctl_rslt);
-    sprintf(temperature->formatted_value, "%d.%d", TZ_KELVTOC(sysctl_rslt));
+    snprintf(temperature->formatted_value, sizeof(temperature->formatted_value), "%d.%d", TZ_KELVTOC(sysctl_rslt));
 
 #elif defined(__OpenBSD__)
     struct sensordev sensordev;
@@ -125,7 +125,7 @@ static int read_temperature(char *thermal_zone, temperature_t *temperature) {
                     }
                 }
                 temperature->raw_value = MUKTOC(sensor.value);
-                sprintf(temperature->formatted_value, "%.2f", MUKTOC(sensor.value));
+                snprintf(temperature->formatted_value, sizeof(temperature->formatted_value), "%.2f", MUKTOC(sensor.value));
             }
         }
     }
@@ -187,7 +187,7 @@ static int read_temperature(char *thermal_zone, temperature_t *temperature) {
 
             float temp = MUKTOC(prop_number_integer_value(obj3));
             temperature->raw_value = temp;
-            sprintf(temperature->formatted_value, "%.2f", temp);
+            snprintf(temperature->formatted_value, sizeof(temperature->formatted_value), "%.2f", temp);
 
             break;
         }
@@ -214,12 +214,12 @@ error_netbsd1:
 void print_cpu_temperature_info(cpu_temperature_ctx_t *ctx) {
     char *outwalk = ctx->buf;
 #ifdef THERMAL_ZONE
-    const char *selected_format = ctx->format;
+    const char *selected_format = (ctx->format != NULL) ? ctx->format : "";
     bool colorful_output = false;
     char *thermal_zone;
     temperature_t temperature;
     temperature.raw_value = 0;
-    sprintf(temperature.formatted_value, "%.2f", 0.0);
+    snprintf(temperature.formatted_value, sizeof(temperature.formatted_value), "%.2f", 0.0);
 
     int asprintf_result;
     if (ctx->path == NULL)

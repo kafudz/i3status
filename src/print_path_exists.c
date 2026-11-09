@@ -14,7 +14,10 @@ void print_path_exists(path_exists_ctx_t *ctx) {
     const char *walk;
     char *outwalk = ctx->buf;
     struct stat st;
-    const bool exists = (stat(ctx->path, &st) == 0);
+    /* path is a required option, but a missing one must not be passed to
+     * stat(2): glibc annotates its first argument as non-NULL and UBSan
+     * reports the call as undefined behaviour. */
+    const bool exists = (ctx->path != NULL && stat(ctx->path, &st) == 0);
 
     if (exists || ctx->format_down == NULL) {
         walk = ctx->format;

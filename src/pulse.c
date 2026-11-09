@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <pulse/pulseaudio.h>
 #include "i3status.h"
 #include "queue.h"
@@ -23,9 +24,10 @@ typedef struct index_info_s {
 static pa_threaded_mainloop *main_loop = NULL;
 static pa_context *context = NULL;
 static pa_mainloop_api *api = NULL;
-static bool context_ready = false;
+/* Updated by the PulseAudio thread and read by the main thread. */
+static _Atomic bool context_ready = false;
 static bool mainloop_thread_running = false;
-static uint32_t default_sink_idx = DEFAULT_SINK_INDEX;
+static _Atomic uint32_t default_sink_idx = DEFAULT_SINK_INDEX;
 TAILQ_HEAD(tailhead, index_info_s)
 cached_info =
     TAILQ_HEAD_INITIALIZER(cached_info);
@@ -193,9 +195,18 @@ static void context_state_callback(pa_context *c, void *userdata) {
         case PA_CONTEXT_CONNECTING:
         case PA_CONTEXT_AUTHORIZING:
         case PA_CONTEXT_SETTING_NAME:
-        case PA_CONTEXT_TERMINATED:
         default:
             context_ready = false;
+            break;
+
+        case PA_CONTEXT_TERMINATED:
+            /* The context is gone for good. Drop it so the next interval can
+             * create a fresh one instead of being stuck forever. */
+            context_ready = false;
+            if (context != NULL) {
+                pa_context_unref(context);
+                context = NULL;
+            }
             break;
 
         case PA_CONTEXT_READY: {
@@ -215,8 +226,10 @@ static void context_state_callback(pa_context *c, void *userdata) {
         case PA_CONTEXT_FAILED:
             /* server disconnected us, attempt to reconnect */
             context_ready = false;
-            pa_context_unref(context);
-            context = NULL;
+            if (context != NULL) {
+                pa_context_unref(context);
+                context = NULL;
+            }
             break;
     }
 }
@@ -249,9 +262,11 @@ int volume_pulseaudio(uint32_t sink_idx, const char *sink_name) {
     /* first time requires a prime callback call because we only get updates
      * when the description or volume actually changes, but we need it to be
      * correct even if it never changes */
-    pa_threaded_mainloop_lock(main_loop);
-    get_sink_info(context, sink_idx, sink_name);
-    pa_threaded_mainloop_unlock(main_loop);
+    if (main_loop != NULL && context != NULL) {
+        pa_threaded_mainloop_lock(main_loop);
+        get_sink_info(context, sink_idx, sink_name);
+        pa_threaded_mainloop_unlock(main_loop);
+    }
     /* show 0 while we don't have this information */
     return 0;
 }
@@ -282,9 +297,11 @@ bool description_pulseaudio(uint32_t sink_idx, const char *sink_name, char buffe
     /* first time requires a prime callback call because we only get updates
      * when the description or volume actually changes, but we need it to be
      * correct even if it never changes */
-    pa_threaded_mainloop_lock(main_loop);
-    get_sink_info(context, sink_idx, sink_name);
-    pa_threaded_mainloop_unlock(main_loop);
+    if (main_loop != NULL && context != NULL) {
+        pa_threaded_mainloop_lock(main_loop);
+        get_sink_info(context, sink_idx, sink_name);
+        pa_threaded_mainloop_unlock(main_loop);
+    }
     /* show empty string while we don't have this information */
     buffer[0] = '\0';
     return true;
@@ -301,11 +318,16 @@ bool pulse_initialize(void) {
     }
     if (!api) {
         api = pa_threaded_mainloop_get_api(main_loop);
-        if (!api)
+        if (!api) {
+            pa_threaded_mainloop_free(main_loop);
+            main_loop = NULL;
             return false;
+        }
     }
     if (!context) {
         pa_proplist *proplist = pa_proplist_new();
+        if (proplist == NULL)
+            return false;
         pa_proplist_sets(proplist, PA_PROP_APPLICATION_NAME, APP_NAME);
         pa_proplist_sets(proplist, PA_PROP_APPLICATION_ID, APP_ID);
         pa_proplist_sets(proplist, PA_PROP_APPLICATION_VERSION, I3STATUS_VERSION);
@@ -321,13 +343,20 @@ bool pulse_initialize(void) {
                                PA_CONTEXT_NOFAIL | PA_CONTEXT_NOAUTOSPAWN,
                                NULL) < 0) {
             pulseaudio_error_log(context);
+            /* Do not keep a half-initialised context around: otherwise every
+             * later call takes the `context != NULL` path and never retries. */
+            pa_context_unref(context);
+            context = NULL;
             return false;
         }
         if (!mainloop_thread_running &&
             pa_threaded_mainloop_start(main_loop) < 0) {
             pulseaudio_error_log(context);
+            pa_context_unref(context);
+            context = NULL;
             pa_threaded_mainloop_free(main_loop);
             main_loop = NULL;
+            api = NULL;
             return false;
         }
         mainloop_thread_running = true;

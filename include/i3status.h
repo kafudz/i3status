@@ -82,21 +82,41 @@ extern char *pct_mark;
     with(const char *, title, current[strlen(name)] == '\0' ? current + strlen(name) : current + strlen(name) + 1) \
         with(cfg_t *, sec, cfg_section = cfg_gettsec(cfg, name, title)) if (sec != NULL)
 
+/* Appends a string to the output buffer without ever writing past its end.
+ * Over-long input is truncated, and the buffer is always NUL-terminated. */
+#define OUTPUT_STRING(str)                                                    \
+    do {                                                                      \
+        const char *_str = (str);                                             \
+        const size_t _used = (size_t)(outwalk - ctx->buf);                    \
+        if (_used < ctx->buflen) {                                            \
+            const size_t _room = ctx->buflen - _used - 1;                     \
+            size_t _len = (_str != NULL) ? strlen(_str) : 0;                  \
+            if (_len > _room)                                                 \
+                _len = _room;                                                 \
+            if (_len > 0)                                                     \
+                memcpy(outwalk, _str, _len);                                  \
+            outwalk += _len;                                                  \
+            *outwalk = '\0';                                                  \
+        }                                                                     \
+    } while (0)
+
 /* Macro which any plugin can use to output the full_text part (when the output
  * format is JSON) or just output to stdout (any other output format). */
 #define OUTPUT_FULL_TEXT(text)                                                                       \
     do {                                                                                             \
         /* Terminate the output buffer here in any case, so that it’s                              \
          * not forgotten in the module */                                                            \
+        const char *_i3s_full_text = (text);                                                         \
         *outwalk = '\0';                                                                             \
         if (output_format == O_I3BAR) {                                                              \
             char *_markup = cfg_getstr(cfg_general, "markup");                                       \
+            const char *_i3s_text = (_i3s_full_text != NULL) ? _i3s_full_text : "";                  \
             yajl_gen_string(ctx->json_gen, (const unsigned char *)"markup", strlen("markup"));       \
             yajl_gen_string(ctx->json_gen, (const unsigned char *)_markup, strlen(_markup));         \
             yajl_gen_string(ctx->json_gen, (const unsigned char *)"full_text", strlen("full_text")); \
-            yajl_gen_string(ctx->json_gen, (const unsigned char *)text, strlen(text));               \
+            yajl_gen_string(ctx->json_gen, (const unsigned char *)_i3s_text, strlen(_i3s_text));     \
         } else {                                                                                     \
-            printf("%s", text);                                                                      \
+            printf("%s", (_i3s_full_text != NULL) ? _i3s_full_text : "");                            \
         }                                                                                            \
     } while (0)
 
@@ -157,16 +177,16 @@ extern char *pct_mark;
                 yajl_gen_string(ctx->json_gen, (const unsigned char *)"color", strlen("color")); \
                 yajl_gen_string(ctx->json_gen, (const unsigned char *)_val, strlen(_val));       \
             } else {                                                                             \
-                outwalk += sprintf(outwalk, "%s", color(colorstr));                              \
+                OUTPUT_STRING(color(colorstr));                                                  \
             }                                                                                    \
         }                                                                                        \
     } while (0)
 
-#define END_COLOR                                                             \
-    do {                                                                      \
-        if (cfg_getbool(cfg_general, "colors") && output_format != O_I3BAR) { \
-            outwalk += sprintf(outwalk, "%s", endcolor());                    \
-        }                                                                     \
+#define END_COLOR                                                                          \
+    do {                                                                                   \
+        if (cfg_getbool(cfg_general, "colors") && output_format != O_I3BAR) {               \
+            OUTPUT_STRING(endcolor());                                                     \
+        }                                                                                  \
     } while (0)
 
 /*
@@ -190,27 +210,12 @@ extern char *pct_mark;
     do {                                                                                           \
         if (output_format == O_I3BAR) {                                                            \
             const char *_i3s_instance = (instance);                                                \
+            const char *_i3s_instance_text =                                                       \
+                (_i3s_instance != NULL) ? _i3s_instance : "";                                      \
             yajl_gen_string(ctx->json_gen, (const unsigned char *)"instance", strlen("instance")); \
-            yajl_gen_string(ctx->json_gen, (const unsigned char *)_i3s_instance,                   \
-                            strlen(_i3s_instance));                                                \
+            yajl_gen_string(ctx->json_gen, (const unsigned char *)_i3s_instance_text,              \
+                            strlen(_i3s_instance_text));                                           \
         }                                                                                          \
-    } while (0)
-
-/* Appends a string to the output buffer without ever writing past its end.
- * Over-long input is truncated, and the buffer is always NUL-terminated. */
-#define OUTPUT_STRING(str)                                                    \
-    do {                                                                      \
-        const char *_str = (str);                                             \
-        const size_t _used = (size_t)(outwalk - ctx->buf);                    \
-        if (_used < ctx->buflen) {                                            \
-            const size_t _room = ctx->buflen - _used - 1;                     \
-            size_t _len = strlen(_str);                                       \
-            if (_len > _room)                                                 \
-                _len = _room;                                                 \
-            memcpy(outwalk, _str, _len);                                      \
-            outwalk += _len;                                                  \
-            *outwalk = '\0';                                                  \
-        }                                                                     \
     } while (0)
 
 #define OUTPUT_FORMATTED OUTPUT_STRING(formatted)

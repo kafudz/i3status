@@ -376,7 +376,9 @@ void print_volume(volume_ctx_t *ctx) {
     }
 
 #endif
-    ctx->buf = apply_volume_format(ctx, ctx->fmt, vol & 0x7f, pbval == 0, devicename);
+    char *formatted = apply_volume_format(ctx, ctx->fmt, vol & 0x7f, pbval == 0, devicename);
+    OUTPUT_FORMATTED;
+    free(formatted);
     close(mixfd);
     goto out_with_format;
 #endif
