@@ -463,6 +463,17 @@ int main(int argc, char *argv[]) {
         CFG_CUSTOM_SEP_BLOCK_WIDTH_OPT,
         CFG_END()};
 
+    cfg_opt_t brightness_opts[] = {
+        CFG_STR("format", "B: %percentage", CFGF_NONE),
+        CFG_STR("format_down", "no brightness", CFGF_NONE),
+        CFG_STR("path", NULL, CFGF_NONE),
+        CFG_CUSTOM_ALIGN_OPT,
+        CFG_CUSTOM_COLOR_OPTS,
+        CFG_CUSTOM_MIN_WIDTH_OPT,
+        CFG_CUSTOM_SEPARATOR_OPT,
+        CFG_CUSTOM_SEP_BLOCK_WIDTH_OPT,
+        CFG_END()};
+
     cfg_opt_t opts[] = {
         CFG_STR_LIST("order", "{}", CFGF_NONE),
         CFG_SEC("general", general_opts, CFGF_NONE),
@@ -474,6 +485,7 @@ int main(int argc, char *argv[]) {
         CFG_SEC("cpu_temperature", temp_opts, CFGF_TITLE | CFGF_MULTI),
         CFG_SEC("disk", disk_opts, CFGF_TITLE | CFGF_MULTI),
         CFG_SEC("volume", volume_opts, CFGF_TITLE | CFGF_MULTI),
+        CFG_SEC("brightness", brightness_opts, CFGF_NONE),
         CFG_SEC("ipv6", ipv6_opts, CFGF_NONE),
         CFG_SEC("time", time_opts, CFGF_NONE),
         CFG_SEC("tztime", tztime_opts, CFGF_TITLE | CFGF_MULTI),
@@ -922,6 +934,20 @@ int main(int argc, char *argv[]) {
                     .mixer_idx = cfg_getint(sec, "mixer_idx"),
                 };
                 print_volume(&ctx);
+                SEC_CLOSE_MAP;
+            }
+
+            CASE_SEC("brightness") {
+                SEC_OPEN_MAP("brightness");
+                brightness_ctx_t ctx = {
+                    .json_gen = json_gen,
+                    .buf = buffer,
+                    .buflen = sizeof(buffer),
+                    .path = cfg_getstr(sec, "path"),
+                    .format = cfg_getstr(sec, "format"),
+                    .format_down = cfg_getstr(sec, "format_down"),
+                };
+                print_brightness(&ctx);
                 SEC_CLOSE_MAP;
             }
 

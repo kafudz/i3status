@@ -65,6 +65,7 @@ order += "wireless wlan0"
 order += "ethernet eth0"
 order += "battery 0"
 order += "cpu_temperature 0"
+order += "brightness"
 order += "memory"
 order += "load"
 order += "tztime local"
@@ -123,6 +124,10 @@ load {
 cpu_temperature 0 {
 	format = "T: %degrees °C"
 	path = "/sys/devices/platform/coretemp.0/temp1_input"
+}
+
+brightness {
+	format = "B: %percentage"
 }
 
 memory {
@@ -659,6 +664,40 @@ volume master {
 	device = "pulse:alsa_output.pci-0000_00_14.2.analog-stereo"
 }
 -------------------------------------------------------------
+
+=== Brightness
+
+Outputs the screen brightness reported by the Linux backlight subsystem. By
+default the first device below +/sys/class/backlight+ is used. The +path+
+option can point to a specific device directory, a glob matching device
+directories, or directly to a +brightness+ file. If the +brightness+ file is
+not available, +actual_brightness+ is used instead.
+
+The following placeholders are available:
+
++%percentage+::
+The current brightness in percent, including the percent sign.
++%brightness+::
+The raw brightness value currently reported by the device.
++%max_brightness+::
+The maximum raw brightness value supported by the device.
++%device+::
+The name of the backlight device.
+
+If no backlight device can be found or the files cannot be read, +format_down+
+is used instead.
+
+*Example order*: +brightness+
+
+*Example format*: +B: %percentage+
+
+*Example format*: +%device: %brightness/%max_brightness (%percentage)+
+
+*Example format_down*: +no backlight+
+
+*Example path*: +/sys/class/backlight/intel_backlight+
+
+*Example path (first available device)*: +/sys/class/backlight/*+
 
 === File Contents
 
