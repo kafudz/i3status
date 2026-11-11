@@ -38,7 +38,10 @@ void print_file_contents(file_contents_ctx_t *ctx) {
     INSTANCE(ctx->path);
 
     if (fd != -1) {
-        ssize_t n = read(fd, buf, max_chars);
+        ssize_t n;
+        do {
+            n = read(fd, buf, max_chars);
+        } while (n == -1 && errno == EINTR);
         if (n == -1) {
             saved_errno = errno;
         } else {

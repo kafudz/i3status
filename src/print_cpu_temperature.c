@@ -119,10 +119,11 @@ static int read_temperature(char *thermal_zone, temperature_t *temperature) {
             for (numt = 0; numt < 1 /*sensordev.maxnumt[SENSOR_TEMP]*/; numt++) {
                 mib[4] = numt;
                 if (sysctl(mib, 5, &sensor, &slen, NULL, 0) == -1) {
-                    if (errno != ENOENT) {
+                    if (errno != ENOENT)
                         warn("sysctl");
-                        continue;
-                    }
+                    /* Never use the sensor struct when the sysctl failed:
+                     * it was not filled in and would produce garbage. */
+                    continue;
                 }
                 temperature->raw_value = MUKTOC(sensor.value);
                 snprintf(temperature->formatted_value, sizeof(temperature->formatted_value), "%.2f", MUKTOC(sensor.value));

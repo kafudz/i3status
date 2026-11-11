@@ -15,7 +15,9 @@
 
 #include "i3status.h"
 
-#define STRING_SIZE 20
+/* Large enough for the longest textual IPv6 address (45 characters) plus the
+ * terminating NUL and some headroom for interface names. */
+#define STRING_SIZE 64
 
 #if defined(__linux__)
 #include <linux/ethtool.h>

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <glob.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/stat.h>
 
 #include "i3status.h"
@@ -36,7 +37,10 @@ bool slurp(const char *filename, char *destination, int size) {
     if ((fd = open(filename, O_RDONLY)) == -1)
         return false;
 
-    ssize_t n = read(fd, destination, size - 1);
+    ssize_t n;
+    do {
+        n = read(fd, destination, size - 1);
+    } while (n == -1 && errno == EINTR);
     if (n != -1)
         destination[n] = '\0';
     (void)close(fd);

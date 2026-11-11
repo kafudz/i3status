@@ -69,6 +69,9 @@
 #include "i3status.h"
 
 #define STRING_SIZE 60
+/* Pango escaping can expand a single character to up to six bytes (&quot;),
+ * so a 32-byte ESSID needs considerably more room than STRING_SIZE. */
+#define ESSID_STRING_SIZE 256
 
 #define WIRELESS_INFO_FLAG_HAS_ESSID (1 << 0)
 #define WIRELESS_INFO_FLAG_HAS_QUALITY (1 << 1)
@@ -580,7 +583,7 @@ void print_wireless_info(wireless_info_ctx_t *ctx) {
     char string_quality[STRING_SIZE] = {'\0'};
     char string_signal[STRING_SIZE] = {'\0'};
     char string_noise[STRING_SIZE] = {'\0'};
-    char string_essid[STRING_SIZE] = {'\0'};
+    char string_essid[ESSID_STRING_SIZE] = {'\0'};
     char string_frequency[STRING_SIZE] = {'\0'};
     char string_ip[STRING_SIZE] = {'\0'};
     char string_bitrate[STRING_SIZE] = {'\0'};
@@ -614,10 +617,10 @@ void print_wireless_info(wireless_info_ctx_t *ctx) {
 
 #ifdef IW_ESSID_MAX_SIZE
     if (info.flags & WIRELESS_INFO_FLAG_HAS_ESSID)
-        maybe_escape_markup(info.essid, string_essid, STRING_SIZE);
+        maybe_escape_markup(info.essid, string_essid, sizeof(string_essid));
     else
 #endif
-        snprintf(string_essid, STRING_SIZE, "?");
+        snprintf(string_essid, sizeof(string_essid), "?");
 
     if (info.flags & WIRELESS_INFO_FLAG_HAS_FREQUENCY)
         snprintf(string_frequency, STRING_SIZE, "%1.1f GHz", info.frequency / 1e9);

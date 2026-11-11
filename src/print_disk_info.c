@@ -118,10 +118,20 @@ static bool below_threshold(struct statvfs buf, const char *prefix_type, const c
                 return false;
         }
 
+        /* f_blocks/f_bfree/f_bavail are counted in f_frsize units on Linux
+         * (and NetBSD), but in f_bsize units on the BSDs. The non-prefixed
+         * branches above already use the matching value; keep this branch
+         * consistent instead of always using f_bsize. */
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__OpenBSD__) || defined(__DragonFly__) || defined(__APPLE__)
+        const double block_size = (double)buf.f_bsize;
+#else
+        const double block_size = (double)buf.f_frsize;
+#endif
+
         if (strcasecmp(threshold_type + 1, "bytes_free") == 0) {
-            return (double)buf.f_bsize * (double)buf.f_bfree < low_threshold * factor;
+            return block_size * (double)buf.f_bfree < low_threshold * factor;
         } else if (strcasecmp(threshold_type + 1, "bytes_avail") == 0) {
-            return (double)buf.f_bsize * (double)buf.f_bavail < low_threshold * factor;
+            return block_size * (double)buf.f_bavail < low_threshold * factor;
         }
     }
 

@@ -271,14 +271,16 @@ void print_volume(volume_ctx_t *ctx) {
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
     char *mixerpath;
     char defaultmixer[] = "/dev/mixer";
-    int mixfd, vol, devmask = 0;
+    int mixfd = -1, vol, devmask = 0;
     const char *devicename = "UNSUPPORTED"; /* TODO: implement support for this */
     pbval = 1;
 
-    if (ctx->mixer_idx > 0)
-        asprintf(&mixerpath, "/dev/mixer%d", ctx->mixer_idx);
-    else
+    if (ctx->mixer_idx > 0) {
+        if (asprintf(&mixerpath, "/dev/mixer%d", ctx->mixer_idx) == -1)
+            die("asprintf() failed\n");
+    } else {
         mixerpath = defaultmixer;
+    }
 
     if ((mixfd = open(mixerpath, O_RDWR)) < 0) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -286,6 +288,8 @@ void print_volume(volume_ctx_t *ctx) {
 #else
         warn("OSS: Cannot open mixer");
 #endif
+        if (ctx->mixer_idx > 0)
+            free(mixerpath);
         goto out;
     }
 
@@ -384,6 +388,12 @@ void print_volume(volume_ctx_t *ctx) {
 #endif
 
 out:
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+    /* Several mixer error paths above jump here after the descriptor was
+     * opened; releasing it here prevents leaking one fd per interval. */
+    if (mixfd >= 0)
+        close(mixfd);
+#endif
     if (!pbval)
         END_COLOR;
     OUTPUT_FULL_TEXT(ctx->buf);

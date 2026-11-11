@@ -178,6 +178,8 @@ char *get_iface_addr(const char *searched_addr_string) {
 
     if (!iface_found) {
         fprintf(stderr, "No matching interface found for the outgoing IPv6\n");
+        /* Do not return the name of an interface matched on an earlier call. */
+        snprintf(iface_string, sizeof(iface_string), "%s", "(error)");
     }
     return iface_string;
 }

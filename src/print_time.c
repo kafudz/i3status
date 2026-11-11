@@ -13,27 +13,31 @@
 #define STRING_SIZE 50
 
 static bool local_timezone_init = false;
-static const char *local_timezone = NULL;
+static char *local_timezone = NULL;
 static const char *current_timezone = NULL;
 
 void set_timezone(const char *tz) {
     if (!local_timezone_init) {
-        /* First call, initialize. */
-        local_timezone = getenv("TZ");
+        /* Copy the value: it is compared against (and may outlive) later
+         * environment modifications such as setenv("TZ", ...). */
+        local_timezone = sstrdup(getenv("TZ"));
         local_timezone_init = true;
     }
     if (tz == NULL || tz[0] == '\0') {
         /* User wants localtime. */
         tz = local_timezone;
     }
-    if (tz != current_timezone) {
-        if (tz) {
-            setenv("TZ", tz, 1);
-        } else {
-            unsetenv("TZ");
-        }
-        current_timezone = tz;
+    if (tz == current_timezone) {
+        /* The process timezone is already correct. tzset() re-reads the
+         * timezone database on every call, so skip it when nothing changed. */
+        return;
     }
+    if (tz) {
+        setenv("TZ", tz, 1);
+    } else {
+        unsetenv("TZ");
+    }
+    current_timezone = tz;
     tzset();
 }
 

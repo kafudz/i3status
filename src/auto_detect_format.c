@@ -23,6 +23,11 @@
  *
  */
 static bool parse_proc_stat(pid_t pid, char **outname, pid_t *outppid) {
+    /* On failure the documented output values are undefined, but leaving a
+     * previously freed pointer behind makes callers use freed memory. Make
+     * failure deterministic instead. */
+    *outname = NULL;
+
     char path[255];
     /* the relevant contents (for us) are:
      * <pid> (<program name>) <status> <ppid>
